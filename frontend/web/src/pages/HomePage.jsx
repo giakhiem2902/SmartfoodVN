@@ -359,7 +359,7 @@ const HomePage = () => {
                   transition: 'all 0.25s',
                   boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
                 }}
-                bodyStyle={{ padding: '32px 20px' }}
+                styles={{ body: { padding: '32px 20px' } }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'translateY(-8px)';
                   e.currentTarget.style.boxShadow = '0 16px 40px rgba(255,107,53,0.15)';
@@ -407,7 +407,7 @@ const HomePage = () => {
                     borderRadius: 20, border: '1.5px solid #ffe4cc',
                     boxShadow: '0 4px 16px rgba(255,107,53,0.08)',
                   }}
-                  bodyStyle={{ padding: '28px 24px' }}
+                  styles={{ body: { padding: '28px 24px' } }}
                 >
                   {/* stars */}
                   <div style={{ marginBottom: 14 }}>

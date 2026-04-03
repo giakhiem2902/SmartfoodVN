@@ -33,6 +33,10 @@ const Food = sequelize.define('food', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  is_hot: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   preparation_time: {
     type: DataTypes.INTEGER,
     defaultValue: 15,

@@ -65,6 +65,49 @@ const getDetails = async (req, res, next) => {
   }
 };
 
+// Get foods by store
+const getFoodsByStore = async (req, res, next) => {
+  try {
+    const { storeId } = req.params;
+
+    const store = await Store.findByPk(storeId);
+    if (!store) {
+      return sendError(res, 'Store not found', 404);
+    }
+
+    const foods = await Food.findAll({
+      where: { store_id: storeId },
+      include: ['category'],
+      order: [['created_at', 'DESC']],
+    });
+
+    sendSuccess(res, foods, 'Foods retrieved');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get categories by store
+const getCategoriesByStore = async (req, res, next) => {
+  try {
+    const { storeId } = req.params;
+
+    const store = await Store.findByPk(storeId);
+    if (!store) {
+      return sendError(res, 'Store not found', 404);
+    }
+
+    const categories = await Category.findAll({
+      where: { store_id: storeId },
+      order: [['created_at', 'ASC']],
+    });
+
+    sendSuccess(res, categories, 'Categories retrieved');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Update store
 const update = async (req, res, next) => {
   try {
@@ -196,6 +239,8 @@ module.exports = {
   getNearbyStores,
   create,
   getDetails,
+  getFoodsByStore,
+  getCategoriesByStore,
   update,
   addCategory,
   addFood,

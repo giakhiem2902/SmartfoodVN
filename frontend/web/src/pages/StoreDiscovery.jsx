@@ -9,7 +9,9 @@ import {
 } from '@ant-design/icons';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
+import { useLocationStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
+import BootstrapIcon from '../components/BootstrapIcon';
 import L from 'leaflet';
 
 // Fix marker icons
@@ -18,6 +20,23 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
   iconUrl: require('leaflet/dist/images/marker-icon.png'),
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
+
+// Custom icons using Bootstrap Icons style
+const createUserIcon = () => L.icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA0OCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48c3R5bGU+LnNoYWRvdyB7IGZpbHRlcjogZHJvcC1zaGFkb3coMCAxMHB4IDIwcHggcmdiYSgwLDAsMCwwLjMpKTsgfTwvc3R5bGU+PC9kZWZzPjwhLS0gU2hhZG93IC0tPjxjaXJjbGUgY3g9IjI0IiBjeT0iNTAiIHI9IjE0IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMSkiIGNsYXNzPSJzaGFkb3ciLz48IS0tIE1haW4gY2lyY2xlIGJhY2tncm91bmQgLS0+PGNpcmNsZSBjeD0iMjQiIGN5PSIyNCIgcj0iMTgiIGZpbGw9IiMyMTk2ZjMiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIvPjwhLS0gVXNlciBpY29uIC0tPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI0LCAyNCkiPjwhLS0gSGVhZCAtLT48Y2lyY2xlIGN4PSIwIiBjeT0iLTYiIHI9IjUiIGZpbGw9IndoaXRlIi8+PCEtLSBCb2R5IC0tPjxwYXRoIGQ9Ik0tNiAyIEwtMyA4IEwzIDggTDYgMiBRMCA0IC0zIDIgUS0zIDIgLTYgMloiIGZpbGw9IndoaXRlIi8+PC9nPjwvc3ZnPg==',
+  iconSize: [48, 60],
+  iconAnchor: [24, 60],
+  popupAnchor: [0, -60],
+  shadowSize: [0, 0],
+});
+
+const createStoreIcon = () => L.icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA0OCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48c3R5bGU+LnNoYWRvdyB7IGZpbHRlcjogZHJvcC1zaGFkb3coMCAxMHB4IDIwcHggcmdiYSgwLDAsMCwwLjMpKTsgfTwvc3R5bGU+PC9kZWZzPjwhLS0gU2hhZG93IC0tPjxjaXJjbGUgY3g9IjI0IiBjeT0iNTAiIHI9IjE0IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMSkiIGNsYXNzPSJzaGFkb3ciLz48IS0tIE1haW4gY2hvcyBiYWNrZ3JvdW5kIC0tPjxwYXRoIGQ9Ik0xMiA1MkM4IDUyIDYgNTAgNiA0N1YyMEM2IDE1IDEwIDEwIDE0IDEwSDE0VjhDMTQgNiAxNiA0IDE4IDRIMzBDMzIgNCAzNCA2IDM0IDhWMTBIMzRDMzggMTAgNDIgMTUgNDIgMjBWNDdDNDIgNTAgNDAgNTIgMzYgNTJIMTJaIiBmaWxsPSIjZmY2YjM1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiLz48IS0tIFdpbmRvdyAtLT48cmVjdCB4PSIxNCIgeT0iMjAiIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPjxyZWN0IHg9IjI2IiB5PSIyMCIgd2lkdGg9IjgiIGhlaWdodD0iMTAiIGZpbGw9IndoaXRlIi8+PCEtLSBEb29yIC0tPjxyZWN0IHg9IjIwIiB5PSIzNiIgd2lkdGg9IjgiIGhlaWdodD0iMTIiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
+  iconSize: [48, 60],
+  iconAnchor: [24, 60],
+  popupAnchor: [0, -60],
+  shadowSize: [0, 0],
 });
 
 const { Title, Text, Paragraph } = Typography;
@@ -36,6 +55,9 @@ const isStoreOpen = (opening, closing) => {
 
 const StoreDiscovery = ({ token, userLocation }) => {
   const navigate = useNavigate();
+  const { userAddress } = useLocationStore();
+  
+  console.log('StoreDiscovery component rendered with userLocation:', userLocation);
 
   const [stores, setStores] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -125,7 +147,15 @@ const StoreDiscovery = ({ token, userLocation }) => {
         }} />
         <div style={{ maxWidth: 860, margin: '0 auto', position: 'relative' }}>
           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>
-            {greeting} 👋
+            {greeting.includes('sáng') ? (
+              <BootstrapIcon icon="sunrise" size={16} color="#fff" style={{ marginRight: 6 }} />
+            ) : greeting.includes('chiều') ? (
+              <BootstrapIcon icon="sun" size={16} color="#fff" style={{ marginRight: 6 }} />
+            ) : (
+              <BootstrapIcon icon="moon-stars" size={16} color="#fff" style={{ marginRight: 6 }} />
+            )}
+            {greeting.replace(/^🌅|☀️|🌙\s+/, '')}
+            <BootstrapIcon icon="hand-thumbs-up" size={16} color="#fff" style={{ marginLeft: 6 }} />
           </Text>
           <Title level={2} style={{ color: 'white', margin: '6px 0 4px', fontSize: 26 }}>
             Bạn muốn ăn gì hôm nay?
@@ -151,13 +181,13 @@ const StoreDiscovery = ({ token, userLocation }) => {
         {/* QUICK STATS */}
         <Row gutter={12} style={{ marginBottom: 24 }}>
           {[
-            { icon: '🏪', label: 'Quán gần bạn', value: stores.length, color: '#ff6b35' },
-            { icon: '✅', label: 'Đang mở cửa', value: stores.filter(s => isStoreOpen(s.opening_time, s.closing_time)).length, color: '#52c41a' },
-            { icon: '📍', label: 'Bán kính tìm kiếm', value: '20 km', color: '#1890ff' },
+            { icon: 'shop', label: 'Quán gần bạn', value: stores.length, color: '#ff6b35' },
+            { icon: 'check-circle-fill', label: 'Đang mở cửa', value: stores.filter(s => isStoreOpen(s.opening_time, s.closing_time)).length, color: '#52c41a' },
+            { icon: 'map', label: 'Bán kính tìm kiếm', value: '20 km', color: '#1890ff' },
           ].map((stat, i) => (
             <Col span={8} key={i}>
               <Card size="small" style={{ borderRadius: 12, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: 'none' }}>
-                <div style={{ fontSize: 22 }}>{stat.icon}</div>
+                <BootstrapIcon icon={stat.icon} size={28} color={stat.color} style={{ marginBottom: 8 }} />
                 <div style={{ fontSize: 20, fontWeight: 700, color: stat.color }}>{stat.value}</div>
                 <div style={{ fontSize: 11, color: '#999' }}>{stat.label}</div>
               </Card>
@@ -168,7 +198,7 @@ const StoreDiscovery = ({ token, userLocation }) => {
         {/* STORE GRID */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <Title level={4} style={{ margin: 0 }}>
-            <ShopOutlined style={{ color: '#ff6b35', marginRight: 8 }} />
+            <BootstrapIcon icon="shop" size={20} color="#ff6b35" style={{ marginRight: 8 }} />
             Quán ăn gần bạn
           </Title>
           <Button icon={<ReloadOutlined />} onClick={fetchNearbyStores} loading={loading} size="small" type="text">
@@ -236,7 +266,7 @@ const StoreDiscovery = ({ token, userLocation }) => {
                         </div>
                       </div>
                     }
-                    bodyStyle={{ padding: '12px 14px' }}
+                    styles={{ body: { padding: '12px 14px' } }}
                   >
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, lineHeight: 1.3 }}>
                       {store.name}
@@ -271,23 +301,34 @@ const StoreDiscovery = ({ token, userLocation }) => {
         {/* MAP */}
         {stores.length > 0 && (
           <div style={{ marginTop: 32 }}>
-            <Title level={4} style={{ marginBottom: 14 }}>🗺️ Bản đồ khu vực</Title>
-            <Card style={{ borderRadius: 16, overflow: 'hidden', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }} bodyStyle={{ padding: 0 }}>
+            <Title level={4} style={{ marginBottom: 14 }}>
+              <BootstrapIcon icon="map" size={20} color="#ff6b35" style={{ marginRight: 8 }} />
+              Bản đồ khu vực
+            </Title>
+            <Card style={{ borderRadius: 16, overflow: 'hidden', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
               <MapContainer center={mapCenter} zoom={14} style={{ height: 380, width: '100%' }}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap contributors'
                 />
-                <Marker position={mapCenter}>
-                  <Popup>📍 Vị trí của bạn</Popup>
+                <Marker position={mapCenter} icon={createUserIcon()}>
+                  <Popup>
+                    <div style={{ textAlign: 'center', minWidth: 200 }}>
+                      <BootstrapIcon icon="geo-alt-fill" size={16} color="#2196f3" style={{ marginRight: 6 }} />
+                      <strong style={{ color: '#2196f3' }}>Vị trí của bạn</strong>
+                      <div style={{ fontSize: 12, color: '#666', marginTop: 6, lineHeight: 1.4, textAlign: 'left' }}>
+                        <strong>Địa chỉ:</strong> {userAddress}
+                      </div>
+                    </div>
+                  </Popup>
                 </Marker>
                 {filtered.map(store => (
-                  <Marker key={store.id} position={[store.lat, store.lng]}>
+                  <Marker key={store.id} position={[store.lat, store.lng]} icon={createStoreIcon()}>
                     <Popup>
-                      <strong>{store.name}</strong><br />
+                      <strong style={{ color: '#ff6b35' }}>{store.name}</strong><br />
                       {store.address}<br />
                       <span
-                        style={{ color: '#ff6b35', cursor: 'pointer' }}
+                        style={{ color: '#ff6b35', cursor: 'pointer', fontWeight: 600 }}
                         onClick={() => openDrawer(store)}
                       >
                         Xem chi tiết →
@@ -307,7 +348,7 @@ const StoreDiscovery = ({ token, userLocation }) => {
         onClose={() => setDrawerOpen(false)}
         width={400}
         title={null}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         {selectedStore && (() => {
           const open = isStoreOpen(selectedStore.opening_time, selectedStore.closing_time);

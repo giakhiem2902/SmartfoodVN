@@ -100,6 +100,18 @@ const apiClient = {
     return response.json();
   },
 
+  async getStore(storeId) {
+    return request('GET', `/stores/${storeId}`);
+  },
+
+  async getStoreFoods(storeId) {
+    return request('GET', `/stores/${storeId}/foods`);
+  },
+
+  async getStoreCategories(storeId) {
+    return request('GET', `/stores/${storeId}/categories`);
+  },
+
   // ==================== ORDERS ====================
   async checkout(orderData) {
     return request('POST', '/orders/checkout', orderData);

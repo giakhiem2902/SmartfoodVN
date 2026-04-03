@@ -14,13 +14,15 @@ router.put('/foods/:foodId', auth, upload.single('image'), storeController.updat
 router.patch('/foods/:foodId/availability', auth, storeController.toggleFoodAvailability);
 router.delete('/foods/:foodId', auth, storeController.deleteItem);
 
-// ===== Store routes =====
+// ===== Store sub-routes (PHẢI đặt TRƯỚC /:storeId) =====
+router.get('/:storeId/foods', storeController.getFoodsByStore);
+router.get('/:storeId/categories', storeController.getCategoriesByStore);
+router.post('/:storeId/categories', auth, upload.single('image'), storeController.addCategory);
+router.post('/:storeId/foods', auth, upload.single('image'), storeController.addFood);
+
+// ===== Store detail routes =====
 router.get('/:storeId', storeController.getDetails);
 router.post('/', auth, authorize('store', 'admin'), upload.single('image'), storeController.create);
 router.put('/:storeId', auth, upload.single('image'), storeController.update);
-
-// ===== Category & Food management (scoped by store) =====
-router.post('/:storeId/categories', auth, upload.single('image'), storeController.addCategory);
-router.post('/:storeId/foods', auth, upload.single('image'), storeController.addFood);
 
 module.exports = router;

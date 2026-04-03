@@ -47,10 +47,12 @@ export const useOrderStore = create((set) => ({
 
 export const useLocationStore = create((set) => ({
   userLocation: null,
+  userAddress: 'Đang xác định vị trí...',
   driverLocation: null,
   nearbyStores: [],
 
   setUserLocation: (location) => set({ userLocation: location }),
+  setUserAddress: (address) => set({ userAddress: address }),
   setDriverLocation: (location) => set({ driverLocation: location }),
   setNearbyStores: (stores) => set({ nearbyStores: stores }),
 }));
