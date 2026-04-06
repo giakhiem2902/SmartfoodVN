@@ -80,7 +80,37 @@ const updateLocation = async (req, res, next) => {
   }
 };
 
-// Toggle driver online status
+// Update user profile
+const updateProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { username, email, phone } = req.body;
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    // Nếu là Google account - chỉ cho phép update phone
+    if (user.google_id) {
+      if (phone) user.phone = phone;
+      await user.save();
+      return sendSuccess(res, user, 'Phone updated successfully');
+    }
+
+    // Nếu là tài khoản thường - cho phép update tất cả
+    if (username) user.username = username;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+
+    await user.save();
+
+    sendSuccess(res, user, 'Profile updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const toggleDriverStatus = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id);
@@ -101,6 +131,7 @@ module.exports = {
   register,
   login,
   getCurrentUser,
+  updateProfile,
   updateLocation,
   toggleDriverStatus,
 };

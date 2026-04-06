@@ -41,6 +41,10 @@ const apiClient = {
     return request('GET', '/auth/me');
   },
 
+  async updateProfile(data) {
+    return request('PUT', '/auth/profile', data);
+  },
+
   async updateLocation(lat, lng) {
     return request('PUT', '/auth/location', { lat, lng });
   },
