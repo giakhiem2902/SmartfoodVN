@@ -1,9 +1,10 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Input } from 'antd';
-import { LogoutOutlined, UserOutlined, SafetyOutlined, ShoppingCartOutlined, FileTextOutlined, TruckOutlined } from '@ant-design/icons';
+import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Input, Dropdown, Card, Tag, Spin, Row, Col, Empty, Divider } from 'antd';
+import { LogoutOutlined, UserOutlined, ShoppingCartOutlined, UserSwitchOutlined, SafetyOutlined, TruckOutlined } from '@ant-design/icons';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuthStore, useLocationStore, useOrderStore } from './store/useStore';
+import apiClient from './services/apiClient';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import StoreDiscovery from './pages/StoreDiscovery';
@@ -15,6 +16,7 @@ import OrderHistory from './pages/OrderHistory';
 import AdminDashboard from './pages/AdminDashboard';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
+import UserProfile from './pages/UserProfile';
 import Cart from './components/Cart';
 import './styles/App.css';
 
@@ -30,7 +32,8 @@ function MainLayout() {
   const navigate = useNavigate();
   const [cartOpen, setCartOpen] = useState(false);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
-  const [trackingOrderId, setTrackingOrderId] = useState('');
+  const [trackingOrders, setTrackingOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Reverse geocode: convert lat/lng to address using Nominatim
   const getAddressFromCoords = useCallback(async (lat, lng) => {
@@ -117,6 +120,26 @@ function MainLayout() {
     message.success('Đã đăng xuất');
   };
 
+  const fetchTrackingOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const response = await apiClient.getUserOrders();
+      if (response && Array.isArray(response)) {
+        setTrackingOrders(response);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      message.error('Không thể tải danh sách đơn hàng');
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const handleOpenTrackingModal = () => {
+    fetchTrackingOrders();
+    setTrackingModalOpen(true);
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
@@ -175,53 +198,58 @@ function MainLayout() {
             </Badge>
           </Tooltip>
 
-          <Tooltip title="Cài đặt bảo mật / 2FA">
-            <Button
-              type="text"
-              icon={<SafetyOutlined />}
-              style={{ color: user?.two_factor_enabled ? '#52c41a' : '#faad14', padding: '4px 8px' }}
-              onClick={() => navigate('/security')}
-            />
-          </Tooltip>
-
-          <Tooltip title="Theo dõi đơn hàng">
-            <Button
-              type="text"
-              icon={<TruckOutlined />}
-              style={{ color: '#ff6b35', padding: '4px 8px' }}
-              onClick={() => setTrackingModalOpen(true)}
-            />
-          </Tooltip>
-
-          <Tooltip title="Lịch sử đơn hàng">
-            <Button
-              type="text"
-              icon={<FileTextOutlined />}
-              style={{ color: '#1890ff', padding: '4px 8px' }}
-              onClick={() => navigate('/orders')}
-            />
-          </Tooltip>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar
-              src={user?.image_url}
-              icon={!user?.image_url && <UserOutlined />}
-              style={{ background: '#ff6b35' }}
-              size={32}
-            />
-            <span style={{ color: '#333', fontWeight: 600, fontSize: 13 }}>{user?.username}</span>
-          </div>
-
-          <Button
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            style={{
-              borderColor: '#ff6b35', color: '#ff6b35',
-              borderRadius: 20, fontWeight: 600,
+          {/* Profile Dropdown Menu */}
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'profile',
+                  label: 'Thông tin cá nhân',
+                  icon: <UserSwitchOutlined />,
+                  onClick: () => navigate('/profile'),
+                },
+                {
+                  key: 'security',
+                  label: 'Bảo mật 2 lớp',
+                  icon: <SafetyOutlined />,
+                  onClick: () => navigate('/security'),
+                },
+                {
+                  key: 'orders',
+                  label: 'Đơn hàng của tôi',
+                  icon: <ShoppingCartOutlined />,
+                  onClick: () => navigate('/orders'),
+                },
+                {
+                  key: 'tracking',
+                  label: 'Theo dõi đơn hàng',
+                  icon: <TruckOutlined />,
+                  onClick: handleOpenTrackingModal,
+                },
+                {
+                  type: 'divider',
+                },
+                {
+                  key: 'logout',
+                  label: 'Đăng xuất',
+                  icon: <LogoutOutlined />,
+                  onClick: handleLogout,
+                  danger: true,
+                },
+              ],
             }}
+            placement="bottomRight"
           >
-            Đăng xuất
-          </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <Avatar
+                src={user?.image_url}
+                icon={!user?.image_url && <UserOutlined />}
+                style={{ background: '#ff6b35' }}
+                size={32}
+              />
+              <span style={{ color: '#333', fontWeight: 600, fontSize: 13 }}>{user?.username}</span>
+            </div>
+          </Dropdown>
         </Space>
       </Header>
 
@@ -235,6 +263,7 @@ function MainLayout() {
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order/:orderId" element={<OrderTracking token={token} />} />
             <Route path="/orders" element={<OrderHistory />} />
+            <Route path="/profile" element={<UserProfile />} />
             <Route path="/security" element={<SecuritySettingsPage />} />
             <Route
               path="/admin"
@@ -250,40 +279,122 @@ function MainLayout() {
 
       {/* Tracking Order Modal */}
       <Modal
-        title="🚚 Theo dõi đơn hàng"
+        title={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>🚚 Theo dõi đơn hàng</span>}
         open={trackingModalOpen}
-        onCancel={() => {
-          setTrackingModalOpen(false);
-          setTrackingOrderId('');
-        }}
-        onOk={() => {
-          if (!trackingOrderId.trim()) {
-            message.warning('Vui lòng nhập mã đơn hàng');
-            return;
-          }
-          navigate(`/order/${trackingOrderId}`);
-          setTrackingModalOpen(false);
-          setTrackingOrderId('');
-        }}
-        okText="Theo dõi"
-        cancelText="Đóng"
+        onCancel={() => setTrackingModalOpen(false)}
+        width={900}
+        footer={null}
+        bodyStyle={{ maxHeight: '600px', overflowY: 'auto' }}
       >
-        <div style={{ marginTop: 16 }}>
-          <Input
-            placeholder="Nhập mã đơn hàng (ví dụ: 5)"
-            value={trackingOrderId}
-            onChange={(e) => setTrackingOrderId(e.target.value)}
-            onPressEnter={() => {
-              if (trackingOrderId.trim()) {
-                navigate(`/order/${trackingOrderId}`);
-                setTrackingModalOpen(false);
-                setTrackingOrderId('');
-              }
-            }}
-            style={{ marginBottom: 8 }}
-          />
-          <small style={{ color: '#999' }}>Nhập số mã đơn hàng của bạn để xem chi tiết và theo dõi vị trí giao hàng</small>
-        </div>
+        <Spin spinning={loadingOrders}>
+          {trackingOrders.length > 0 ? (
+            <div>
+              <div style={{ marginBottom: '16px', padding: '10px', backgroundColor: '#f0f5ff', borderRadius: '4px' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#1890ff' }}>
+                  📋 Tổng cộng <strong>{trackingOrders.length}</strong> đơn hàng
+                </p>
+              </div>
+
+              <Row gutter={[16, 16]}>
+                {trackingOrders.map((order) => {
+                  const statusColors = {
+                    PENDING: { color: 'orange', text: '⏳ Chờ xác nhận' },
+                    CONFIRMED: { color: 'blue', text: '✅ Đã xác nhận' },
+                    FINDING_DRIVER: { color: 'cyan', text: '🔍 Tìm tài xế' },
+                    DRIVER_ACCEPTED: { color: 'green', text: '🤝 Tài xế nhận' },
+                    DELIVERING: { color: 'blue', text: '🚚 Đang giao' },
+                    COMPLETED: { color: 'green', text: '✨ Hoàn thành' },
+                    CANCELLED: { color: 'red', text: '❌ Hủy' },
+                  };
+
+                  return (
+                    <Col xs={24} sm={12} key={order.id}>
+                      <Card
+                        hoverable
+                        onClick={() => {
+                          navigate(`/order/${order.id}`);
+                          setTrackingModalOpen(false);
+                        }}
+                        style={{
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          border: '1px solid #f0f0f0',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = '';
+                          e.currentTarget.style.transform = '';
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                          <div>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold', color: '#1890ff' }}>
+                              Đơn hàng <span style={{ color: '#ff6b35' }}>#{order.id}</span>
+                            </p>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
+                              📅 {new Date(order.created_at).toLocaleDateString('vi-VN')}
+                            </p>
+                          </div>
+                          <Tag color={statusColors[order.status]?.color} style={{ marginTop: '4px' }}>
+                            {statusColors[order.status]?.text}
+                          </Tag>
+                        </div>
+
+                        <Divider style={{ margin: '8px 0' }} />
+
+                        <div style={{ marginBottom: '8px' }}>
+                          <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#999' }}>Cửa hàng</p>
+                          <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: '#222' }}>
+                            🏪 {order.store?.name || 'N/A'}
+                          </p>
+                        </div>
+
+                        <div style={{ marginBottom: '8px' }}>
+                          <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#999' }}>Giao đến</p>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#555' }}>
+                            📍 {order.delivery_address || 'N/A'}
+                          </p>
+                        </div>
+
+                        <Divider style={{ margin: '8px 0' }} />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#999' }}>Tổng tiền</p>
+                            <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#ff7a00' }}>
+                              {order.total_price?.toLocaleString()} đ
+                            </p>
+                          </div>
+                          <Button
+                            type="primary"
+                            size="small"
+                            style={{ borderRadius: '4px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/order/${order.id}`);
+                              setTrackingModalOpen(false);
+                            }}
+                          >
+                            Xem chi tiết →
+                          </Button>
+                        </div>
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </div>
+          ) : (
+            <Empty
+              description="Bạn chưa có đơn hàng nào"
+              style={{ marginTop: '40px', marginBottom: '40px' }}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          )}
+        </Spin>
       </Modal>
     </Layout>
   );

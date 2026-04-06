@@ -10,6 +10,7 @@ router.post('/login', authController.login);
 
 // Protected routes
 router.get('/me', auth, authController.getCurrentUser);
+router.put('/profile', auth, authController.updateProfile);
 router.put('/location', auth, authController.updateLocation);
 router.post('/driver/toggle-status', auth, authController.toggleDriverStatus);
 
