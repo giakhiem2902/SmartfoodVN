@@ -4,6 +4,7 @@ import {
 } from 'antd';
 import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useOrderStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
 import './StoreMenu.css';
 
@@ -20,6 +21,7 @@ const getImageSrc = (url) => {
 const StoreMenu = ({ token }) => {
   const navigate = useNavigate();
   const { storeId } = useParams();
+  const { cart: cartItems, addToCart: addToCartStore } = useOrderStore();
 
   const [store, setStore] = useState(null);
   const [foods, setFoods] = useState([]);
@@ -29,7 +31,6 @@ const StoreMenu = ({ token }) => {
   const [selectedFood, setSelectedFood] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [cart, setCart] = useState([]);
 
   // Fetch store info và menu
   useEffect(() => {
@@ -77,10 +78,12 @@ const StoreMenu = ({ token }) => {
       quantity,
       image_url: selectedFood.image_url,
       storeId,
+      storeName: store?.name || 'Quán ăn',
     };
-    setCart([...cart, newItem]);
+    addToCartStore(newItem);
     message.success(`Thêm ${selectedFood.name} x${quantity} vào giỏ hàng`);
     setDrawerOpen(false);
+    setQuantity(1);
   };
 
   // Filter foods by selected category
@@ -135,19 +138,6 @@ const StoreMenu = ({ token }) => {
               </Text>
             </div>
           </div>
-          <Tooltip title={`Giỏ hàng (${cart.length} món)`}>
-            <Badge count={cart.length} showZero>
-              <Button
-                type="primary"
-                icon={<ShoppingCartOutlined />}
-                size="large"
-                className="store-menu-cart-btn"
-                onClick={() => message.info(`Giỏ hàng: ${cart.length} món`)}
-              >
-                Giỏ hàng
-              </Button>
-            </Badge>
-          </Tooltip>
         </div>
       </div>
 

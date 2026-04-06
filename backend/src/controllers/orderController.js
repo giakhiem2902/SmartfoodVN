@@ -10,6 +10,11 @@ const checkout = async (req, res, next) => {
     const { storeId, items, deliveryLat, deliveryLng, deliveryAddress, notes, paymentMethod } = req.body;
     const userId = req.user.id;
 
+    console.log('=== CHECKOUT REQUEST ===');
+    console.log('StoreId received:', storeId, 'Type:', typeof storeId);
+    console.log('Items:', items);
+    console.log('Full request body:', req.body);
+
     if (!storeId || !items || !Array.isArray(items) || items.length === 0) {
       return sendError(res, 'Store ID and items array are required', 400);
     }
@@ -29,6 +34,7 @@ const checkout = async (req, res, next) => {
       paymentMethod || 'CASH'
     );
 
+    console.log('Order created:', order.id, 'with store_id:', order.store_id);
     sendSuccess(res, order, 'Order created successfully', 201);
   } catch (error) {
     if (error.message.includes('not found')) {
@@ -67,8 +73,21 @@ const getUserOrders = async (req, res, next) => {
       where: { user_id: userId },
       include: [
         {
+          association: 'store',
+          attributes: ['id', 'name', 'address', 'phone', 'lat', 'lng'],
+        },
+        {
+          association: 'driver',
+          attributes: ['id', 'username', 'phone', 'lat', 'lng', 'is_online'],
+        },
+        {
           association: 'items',
-          include: [{ model: Food }],
+          include: [
+            {
+              model: Food,
+              attributes: ['id', 'name', 'price', 'image_url'],
+            },
+          ],
         },
       ],
       order: [['created_at', 'DESC']],

@@ -1,17 +1,21 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Layout, Button, Avatar, message, Space, Tooltip } from 'antd';
-import { LogoutOutlined, UserOutlined, SafetyOutlined } from '@ant-design/icons';
+import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Input } from 'antd';
+import { LogoutOutlined, UserOutlined, SafetyOutlined, ShoppingCartOutlined, FileTextOutlined, TruckOutlined } from '@ant-design/icons';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { useAuthStore, useLocationStore } from './store/useStore';
+import { useAuthStore, useLocationStore, useOrderStore } from './store/useStore';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import StoreDiscovery from './pages/StoreDiscovery';
 import StoreMenu from './pages/StoreMenu';
+import CartPage from './pages/CartPage';
+import Checkout from './pages/Checkout';
 import OrderTracking from './pages/OrderTracking';
+import OrderHistory from './pages/OrderHistory';
 import AdminDashboard from './pages/AdminDashboard';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
+import Cart from './components/Cart';
 import './styles/App.css';
 
 const { Header, Content } = Layout;
@@ -22,7 +26,11 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 function MainLayout() {
   const { user, token, logout } = useAuthStore();
   const { userLocation, userAddress, setUserLocation, setUserAddress } = useLocationStore();
+  const { cart } = useOrderStore();
   const navigate = useNavigate();
+  const [cartOpen, setCartOpen] = useState(false);
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState('');
 
   // Reverse geocode: convert lat/lng to address using Nominatim
   const getAddressFromCoords = useCallback(async (lat, lng) => {
@@ -156,12 +164,41 @@ function MainLayout() {
             </Tooltip>
           )}
 
+          <Tooltip title="Giỏ hàng">
+            <Badge count={cart.length} showZero style={{ backgroundColor: '#ff6b35' }}>
+              <Button
+                type="text"
+                icon={<ShoppingCartOutlined />}
+                style={{ color: '#333', fontSize: 18, padding: '4px 8px' }}
+                onClick={() => setCartOpen(true)}
+              />
+            </Badge>
+          </Tooltip>
+
           <Tooltip title="Cài đặt bảo mật / 2FA">
             <Button
               type="text"
               icon={<SafetyOutlined />}
               style={{ color: user?.two_factor_enabled ? '#52c41a' : '#faad14', padding: '4px 8px' }}
               onClick={() => navigate('/security')}
+            />
+          </Tooltip>
+
+          <Tooltip title="Theo dõi đơn hàng">
+            <Button
+              type="text"
+              icon={<TruckOutlined />}
+              style={{ color: '#ff6b35', padding: '4px 8px' }}
+              onClick={() => setTrackingModalOpen(true)}
+            />
+          </Tooltip>
+
+          <Tooltip title="Lịch sử đơn hàng">
+            <Button
+              type="text"
+              icon={<FileTextOutlined />}
+              style={{ color: '#1890ff', padding: '4px 8px' }}
+              onClick={() => navigate('/orders')}
             />
           </Tooltip>
 
@@ -194,7 +231,10 @@ function MainLayout() {
             <Route path="/" element={<HomePage />} />
             <Route path="/stores" element={<StoreDiscovery token={token} userLocation={userLocation} />} />
             <Route path="/store/:storeId" element={<StoreMenu token={token} />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<Checkout />} />
             <Route path="/order/:orderId" element={<OrderTracking token={token} />} />
+            <Route path="/orders" element={<OrderHistory />} />
             <Route path="/security" element={<SecuritySettingsPage />} />
             <Route
               path="/admin"
@@ -204,6 +244,47 @@ function MainLayout() {
           </Routes>
         </Content>
       </Layout>
+
+      {/* Cart Drawer */}
+      <Cart open={cartOpen} onClose={() => setCartOpen(false)} />
+
+      {/* Tracking Order Modal */}
+      <Modal
+        title="🚚 Theo dõi đơn hàng"
+        open={trackingModalOpen}
+        onCancel={() => {
+          setTrackingModalOpen(false);
+          setTrackingOrderId('');
+        }}
+        onOk={() => {
+          if (!trackingOrderId.trim()) {
+            message.warning('Vui lòng nhập mã đơn hàng');
+            return;
+          }
+          navigate(`/order/${trackingOrderId}`);
+          setTrackingModalOpen(false);
+          setTrackingOrderId('');
+        }}
+        okText="Theo dõi"
+        cancelText="Đóng"
+      >
+        <div style={{ marginTop: 16 }}>
+          <Input
+            placeholder="Nhập mã đơn hàng (ví dụ: 5)"
+            value={trackingOrderId}
+            onChange={(e) => setTrackingOrderId(e.target.value)}
+            onPressEnter={() => {
+              if (trackingOrderId.trim()) {
+                navigate(`/order/${trackingOrderId}`);
+                setTrackingModalOpen(false);
+                setTrackingOrderId('');
+              }
+            }}
+            style={{ marginBottom: 8 }}
+          />
+          <small style={{ color: '#999' }}>Nhập số mã đơn hàng của bạn để xem chi tiết và theo dõi vị trí giao hàng</small>
+        </div>
+      </Modal>
     </Layout>
   );
 }

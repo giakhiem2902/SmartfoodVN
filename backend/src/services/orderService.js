@@ -21,8 +21,8 @@ const createOrder = async (userId, storeId, items, deliveryLat, deliveryLng, del
     // Calculate total food price
     let totalFoodPrice = 0;
     for (const item of items) {
-      const food = await Food.findByPk(item.foodId);
-      if (!food) throw new Error(`Food with id ${item.foodId} not found`);
+      const food = await Food.findByPk(item.food_id);
+      if (!food) throw new Error(`Food with id ${item.food_id} not found`);
       totalFoodPrice += parseFloat(food.price) * item.quantity;
     }
 
@@ -46,10 +46,10 @@ const createOrder = async (userId, storeId, items, deliveryLat, deliveryLng, del
 
     // Create order items
     for (const item of items) {
-      const food = await Food.findByPk(item.foodId);
+      const food = await Food.findByPk(item.food_id);
       await OrderItem.create({
         order_id: order.id,
-        food_id: item.foodId,
+        food_id: item.food_id,
         quantity: item.quantity,
         price: food.price,
         notes: item.notes || null,
@@ -75,6 +75,10 @@ const getOrderDetails = async (orderId) => {
         {
           association: 'driver',
           attributes: ['id', 'username', 'phone', 'lat', 'lng', 'is_online'],
+        },
+        {
+          association: 'store',
+          attributes: ['id', 'name', 'lat', 'lng', 'phone', 'address'],
         },
         {
           association: 'items',

@@ -113,6 +113,10 @@ const apiClient = {
   },
 
   // ==================== ORDERS ====================
+  async createOrder(orderData) {
+    return request('POST', '/orders', orderData);
+  },
+
   async checkout(orderData) {
     return request('POST', '/orders/checkout', orderData);
   },

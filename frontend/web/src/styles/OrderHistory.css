@@ -1,0 +1,29 @@
+/* Order History Styles */
+
+.order-details {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.order-details p {
+  margin-bottom: 8px;
+}
+
+.order-details strong {
+  color: #333;
+}
+
+.order-details .ant-tag {
+  margin-top: 5px;
+}
+
+@media (max-width: 768px) {
+  .order-details {
+    font-size: 14px;
+  }
+
+  .order-details p {
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+}

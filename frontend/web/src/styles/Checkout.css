@@ -1,0 +1,151 @@
+/* Checkout Page Styles */
+
+.checkout-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: calc(100vh - 64px);
+}
+
+.checkout-header {
+  margin-bottom: 32px;
+}
+
+.checkout-header h2 {
+  color: #333;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.checkout-content {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.checkout-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.checkout-card .ant-card-head {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7a86e 100%);
+  border: none;
+}
+
+.checkout-card .ant-card-head .ant-card-head-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.checkout-summary {
+  position: sticky;
+  top: 100px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 14px;
+}
+
+.summary-row.total {
+  padding: 16px 0;
+  font-size: 16px;
+  color: #ff6b35;
+  border-top: 2px solid #f0f0f0;
+}
+
+.checkout-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 40px 20px;
+}
+
+.checkout-success {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.success-icon {
+  margin-bottom: 24px;
+}
+
+/* Form Styles */
+.ant-form-item-label > label {
+  font-weight: 600;
+  color: #333;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-select,
+.ant-picker,
+.ant-textarea {
+  border-color: #d9d9d9 !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+}
+
+.ant-input:hover,
+.ant-input:focus {
+  border-color: #ff6b35 !important;
+}
+
+.ant-input-prefix {
+  color: #ff6b35;
+}
+
+/* Table Styles */
+.ant-table-wrapper {
+  margin-bottom: 16px;
+}
+
+.ant-table-thead > tr > th {
+  background: #f9f9f9;
+  font-weight: 600;
+  border-color: #f0f0f0;
+}
+
+.ant-table-tbody > tr > td {
+  border-color: #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .checkout-container {
+    padding: 12px;
+  }
+
+  .checkout-header {
+    margin-bottom: 16px;
+  }
+
+  .checkout-summary {
+    position: relative;
+    top: 0;
+    margin-top: 16px;
+  }
+
+  .summary-row {
+    padding: 10px 0;
+    font-size: 13px;
+  }
+
+  .checkout-card {
+    margin-bottom: 16px;
+  }
+}
