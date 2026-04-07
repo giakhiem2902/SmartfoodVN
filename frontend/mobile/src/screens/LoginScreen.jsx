@@ -35,7 +35,7 @@ const LoginScreen = ({ navigation }) => {
 
       if (response.success && response.data.user.role === 'driver') {
         await setToken(response.data.token);
-        setUser(response.data.user);
+        await setUser(response.data.user);
         navigation.replace('Main');
       } else {
         Alert.alert('Error', 'Invalid credentials or not a driver account');
@@ -66,7 +66,7 @@ const LoginScreen = ({ navigation }) => {
 
       if (response.success) {
         await setToken(response.data.token);
-        setUser(response.data.user);
+        await setUser(response.data.user);
         navigation.replace('Main');
       } else {
         Alert.alert('Error', response.message);

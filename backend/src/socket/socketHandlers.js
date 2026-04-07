@@ -76,6 +76,13 @@ const setupSocketHandlers = (io) => {
           });
         }
 
+        if (status === 'PICKING_UP') {
+          io.to(roomName).emit('DRIVER_PICKING_UP', {
+            orderId,
+            message: 'Driver is heading to the store',
+          });
+        }
+
         if (status === 'DRIVER_ACCEPTED') {
           io.to(roomName).emit('DRIVER_ACCEPTED', {
             orderId,
@@ -134,6 +141,7 @@ const setupSocketHandlers = (io) => {
     // ========== Driver Status ==========
     socket.on('DRIVER_ONLINE', async (data) => {
       const { driverId } = data;
+      if (!driverId) return console.warn('DRIVER_ONLINE: missing driverId');
       try {
         await User.update(
           { is_online: true },
@@ -152,6 +160,7 @@ const setupSocketHandlers = (io) => {
 
     socket.on('DRIVER_OFFLINE', async (data) => {
       const { driverId } = data;
+      if (!driverId) return console.warn('DRIVER_OFFLINE: missing driverId');
       try {
         await User.update(
           { is_online: false },

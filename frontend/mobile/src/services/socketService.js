@@ -1,27 +1,32 @@
 import io from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:5001';
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:5001';
 
 class SocketService {
   constructor() {
     this.socket = null;
   }
 
-  connect() {
+  connect(token) {
     if (!this.socket) {
       this.socket = io(SOCKET_URL, {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: 5,
+        auth: token ? { token } : undefined,
       });
 
       this.socket.on('connect', () => {
-        console.log('✅ Socket connected');
+        console.log('✅ Socket connected:', this.socket.id);
       });
 
-      this.socket.on('disconnect', () => {
-        console.log('❌ Socket disconnected');
+      this.socket.on('disconnect', (reason) => {
+        console.log('❌ Socket disconnected:', reason);
+      });
+
+      this.socket.on('connect_error', (err) => {
+        console.log('⚠️ Socket connection error:', err.message);
       });
     }
   }
@@ -33,52 +38,62 @@ class SocketService {
     }
   }
 
-  // Driver events
+  // ─── Driver presence ───────────────────────────────────────────────────────
   driverOnline(driverId) {
-    if (this.socket) {
-      this.socket.emit('DRIVER_ONLINE', { driverId });
-    }
+    this.socket?.emit('DRIVER_ONLINE', { driverId });
   }
 
   driverOffline(driverId) {
-    if (this.socket) {
-      this.socket.emit('DRIVER_OFFLINE', { driverId });
-    }
+    this.socket?.emit('DRIVER_OFFLINE', { driverId });
   }
 
-  // Receive new orders
-  onNewOrderAvailable(callback) {
-    if (this.socket) {
-      this.socket.on('NEW_ORDER_AVAILABLE', callback);
-    }
+  // ─── Order room management ─────────────────────────────────────────────────
+  joinOrder(orderId, userId) {
+    this.socket?.emit('JOIN_ORDER', { orderId, userId });
   }
 
-  // Send location updates
+  leaveOrder(orderId) {
+    this.socket?.emit('LEAVE_ORDER', { orderId });
+  }
+
+  // ─── Real-time driver location ─────────────────────────────────────────────
   updateDriverLocation(orderId, lat, lng, driverId) {
-    if (this.socket) {
-      this.socket.emit('DRIVER_LOCATION_UPDATE', { orderId, lat, lng, driverId });
-    }
+    this.socket?.emit('DRIVER_LOCATION_UPDATE', { orderId, lat, lng, driverId });
   }
 
-  // Join order room
-  joinOrder(orderId, driverId) {
-    if (this.socket) {
-      this.socket.emit('JOIN_ORDER', { orderId, userId: driverId });
-    }
+  // ─── Update order status via socket (broadcast to order room) ─────────────
+  emitOrderStatusUpdate(orderId, status) {
+    this.socket?.emit('UPDATE_ORDER_STATUS', { orderId, status });
   }
 
-  // Listen for order status changes
+  // ─── Listeners ────────────────────────────────────────────────────────────
+  onNewOrderAvailable(callback) {
+    this.socket?.on('NEW_ORDER_AVAILABLE', callback);
+  }
+
   onOrderStatusChanged(callback) {
-    if (this.socket) {
-      this.socket.on('ORDER_STATUS_CHANGED', callback);
-    }
+    this.socket?.on('ORDER_STATUS_CHANGED', callback);
+  }
+
+  /** Real-time driver location updates coming from server (for customer view) */
+  onDriverLocation(callback) {
+    this.socket?.on('DRIVER_LOCATION', callback);
+  }
+
+  /** Fired once when driver first accepts the order */
+  onDriverAccepted(callback) {
+    this.socket?.on('DRIVER_ACCEPTED', callback);
+  }
+
+  /** Fired when order is fully completed */
+  onOrderCompleted(callback) {
+    this.socket?.on('ORDER_COMPLETED', callback);
   }
 
   off(event) {
-    if (this.socket) {
-      this.socket.off(event);
-    }
+    this.socket?.off(event);
   }
 }
 
 export default new SocketService();
+

@@ -1,6 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+// ─── OSRM Public API (OpenStreetMap routing) ──────────────────────────────────
+// Returns decoded array of { latitude, longitude } for a multi-waypoint route
+export const fetchOSRMRoute = async (waypoints) => {
+  // waypoints: [{ latitude, longitude }, ...]
+  const coords = waypoints.map((p) => `${p.longitude},${p.latitude}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.code === 'Ok' && json.routes.length > 0) {
+      // GeoJSON coordinates are [lng, lat]
+      return json.routes[0].geometry.coordinates.map(([lng, lat]) => ({
+        latitude: lat,
+        longitude: lng,
+      }));
+    }
+    return null;
+  } catch (e) {
+    console.error('OSRM fetch error:', e);
+    return null;
+  }
+};
 
 const apiClient = {
   async login(email, password) {
@@ -44,8 +67,13 @@ const apiClient = {
     return response.json();
   },
 
-  async getAvailableOrders(token) {
-    const response = await fetch(`${API_BASE_URL}/orders/available`, {
+  // Lấy các đơn hàng available, lọc theo vị trí driver (radius km, mặc định 10)
+  async getAvailableOrders(token, lat, lng, radiusKm = 10) {
+    let url = `${API_BASE_URL}/orders/available`;
+    if (lat != null && lng != null) {
+      url += `?lat=${lat}&lng=${lng}&radius=${radiusKm}`;
+    }
+    const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.json();

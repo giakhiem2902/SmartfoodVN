@@ -22,6 +22,7 @@ const Order = sequelize.define('order', {
       'CONFIRMED',
       'FINDING_DRIVER',
       'DRIVER_ACCEPTED',
+      'PICKING_UP',
       'DELIVERING',
       'COMPLETED',
       'CANCELLED'
