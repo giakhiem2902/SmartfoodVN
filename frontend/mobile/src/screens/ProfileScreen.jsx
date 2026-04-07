@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuthStore, useDriverStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
 import socketService from '../services/socketService';
@@ -11,22 +11,29 @@ const ProfileScreen = ({ navigation }) => {
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
-    socketService.connect();
+    const { token } = useAuthStore.getState();
+    socketService.connect(token);
   }, []);
 
   const handleToggleStatus = async () => {
     try {
       setToggling(true);
-      const { token } = useAuthStore.getState();
+      const { token, user: currentUser } = useAuthStore.getState();
+
+      if (!currentUser?.id) {
+        Alert.alert('Error', 'User not loaded yet, please try again');
+        return;
+      }
+
       const response = await apiClient.toggleDriverStatus(token);
 
       if (response.success) {
         setIsOnline(!isOnline);
 
         if (!isOnline) {
-          socketService.driverOnline(user.id);
+          socketService.driverOnline(currentUser.id);
         } else {
-          socketService.driverOffline(user.id);
+          socketService.driverOffline(currentUser.id);
         }
 
         Alert.alert('Success', isOnline ? 'You are now OFFLINE' : 'You are now ONLINE');

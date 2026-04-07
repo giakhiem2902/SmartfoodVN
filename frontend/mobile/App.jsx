@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuthStore } from './src/store/useStore';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -11,7 +11,7 @@ import ActiveDeliveriesScreen from './src/screens/ActiveDeliveriesScreen';
 import DeliveryMapScreen from './src/screens/DeliveryMapScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const DriverTabs = () => {
@@ -24,7 +24,7 @@ const DriverTabs = () => {
           let iconName;
 
           if (route.name === 'AvailableOrders') {
-            iconName = focused ? 'bag' : 'bag-outline';
+            iconName = focused ? 'clipboard-list' : 'clipboard-list-outline';
           } else if (route.name === 'ActiveDeliveries') {
             iconName = focused ? 'truck' : 'truck-outline';
           } else if (route.name === 'Profile') {

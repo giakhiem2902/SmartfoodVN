@@ -1,4 +1,5 @@
 const { Order, OrderItem, Food } = require('../models');
+const { Op } = require('sequelize');
 const { createOrder, getOrderDetails, updateOrderStatus, assignDriverToOrder } = require('../services/orderService');
 const { findAvailableDrivers } = require('../services/locationService');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
@@ -159,19 +160,61 @@ const acceptOrder = async (req, res, next) => {
   }
 };
 
-// Get available orders for driver
+// Get available orders for driver (optionally filtered by driver location within radius km)
 const getAvailableOrders = async (req, res, next) => {
   try {
     if (req.user.role !== 'driver') {
       return sendError(res, 'Only drivers can view available orders', 403);
     }
 
+    const { lat, lng, radius } = req.query; // driver's current coords + search radius (km)
+
+    // Always include store info so the mobile map can show store markers
     const orders = await Order.findAll({
       where: { status: 'FINDING_DRIVER' },
+      include: [
+        {
+          association: 'store',
+          attributes: ['id', 'name', 'address', 'lat', 'lng', 'phone'],
+        },
+        {
+          association: 'items',
+          include: [{ model: Food, attributes: ['id', 'name', 'price', 'image_url'] }],
+        },
+      ],
       order: [['created_at', 'ASC']],
     });
 
-    sendSuccess(res, orders);
+    // If driver sends their coordinates, filter & annotate with distance_to_store
+    if (lat && lng) {
+      const driverLat = parseFloat(lat);
+      const driverLng = parseFloat(lng);
+      const maxKm = parseFloat(radius) || 10;
+
+      const { calculateDistance } = require('../utils/geoUtils');
+
+      const nearby = orders
+        .map((o) => {
+          const plain = o.toJSON();
+          if (plain.store) {
+            const dist = calculateDistance(
+              driverLat, driverLng,
+              parseFloat(plain.store.lat),
+              parseFloat(plain.store.lng)
+            );
+            plain.distance_to_store = Math.round(dist * 10) / 10; // km, 1 decimal
+            return plain;
+          }
+          plain.distance_to_store = null;
+          return plain;
+        })
+        .filter((o) => o.distance_to_store === null || o.distance_to_store <= maxKm)
+        .sort((a, b) => (a.distance_to_store ?? 99) - (b.distance_to_store ?? 99));
+
+      return sendSuccess(res, nearby);
+    }
+
+    sendSuccess(res, orders.map((o) => o.toJSON()));
   } catch (error) {
     next(error);
   }
@@ -185,7 +228,24 @@ const getDriverOrders = async (req, res, next) => {
     }
 
     const orders = await Order.findAll({
-      where: { driver_id: req.user.id },
+      where: {
+        driver_id: req.user.id,
+        status: { [Op.in]: ['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING'] },
+      },
+      include: [
+        {
+          association: 'store',
+          attributes: ['id', 'name', 'address', 'lat', 'lng', 'phone'],
+        },
+        {
+          association: 'user',
+          attributes: ['id', 'username', 'phone', 'lat', 'lng'],
+        },
+        {
+          association: 'items',
+          include: [{ model: Food, attributes: ['id', 'name', 'price', 'image_url'] }],
+        },
+      ],
       order: [['created_at', 'DESC']],
     });
 
