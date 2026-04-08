@@ -1,12 +1,3 @@
-/**
- * AvailableOrdersScreen
- * ─────────────────────
- * • Tự động lấy vị trí GPS của driver
- * • Hiển thị bản đồ OSM (react-native-maps + UrlTile) với marker các cửa hàng
- *   có đơn hàng đang cần giao trong vòng 10 km
- * • Danh sách đơn hàng sắp xếp theo khoảng cách tới cửa hàng
- * • Realtime: nhận socket NEW_ORDER_AVAILABLE để refresh
- */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -19,7 +10,12 @@ import {
   RefreshControl,
   Platform,
   PermissionsAndroid,
+  StatusBar,
 } from 'react-native';
+
+const PRIMARY = '#ff6b35';
+const PRIMARY_LIGHT = '#fff3ee';
+const PRIMARY_DARK = '#e55a24';
 import Geolocation from 'react-native-geolocation-service';
 import OsmMap from '../components/OsmMap';
 import { useAuthStore, useDriverStore } from '../store/useStore';
@@ -39,6 +35,7 @@ const AvailableOrdersScreen = ({ navigation }) => {
   const [togglingOnline, setTogglingOnline] = useState(false);
 
   const mapRef = useRef(null);
+  const mapWebViewRef = useRef(null);
   const watchIdRef = useRef(null);
 
   // ─── Get driver GPS ─────────────────────────────────────────────────────────
@@ -144,28 +141,18 @@ const AvailableOrdersScreen = ({ navigation }) => {
 
   // ─── Fit map to show all store markers ──────────────────────────────────────
   const fitMapToOrders = (orderList, driverLoc) => {
-    if (!mapRef.current) return;
-    const coords = [];
-    if (driverLoc) coords.push(driverLoc);
-    orderList.forEach((o) => {
-      if (o.store?.lat && o.store?.lng) {
-        coords.push({
-          latitude: parseFloat(o.store.lat),
-          longitude: parseFloat(o.store.lng),
-        });
-      }
-    });
-    if (coords.length > 0) {
-      mapRef.current.fitToCoordinates(coords, {
-        edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-        animated: true,
-      });
+    // Inject FIT_BOUNDS vào WebView (OsmMap tự tính bounds từ markers + route)
+    if (mapWebViewRef.current) {
+      mapWebViewRef.current.injectJavaScript(
+        `handleMessage(${JSON.stringify(JSON.stringify({ type: 'FIT_BOUNDS' }))});true;`
+      );
     }
   };
 
   // ─── Mount ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    startLocationWatch();
+    // Delay nhỏ để Activity attach xong trước khi gọi PermissionsAndroid
+    const timer = setTimeout(() => startLocationWatch(), 300);
     socketService.connect(token);
     if (user?.id) socketService.driverOnline(user.id);
 
@@ -179,6 +166,7 @@ const AvailableOrdersScreen = ({ navigation }) => {
     });
 
     return () => {
+      clearTimeout(timer);
       if (watchIdRef.current != null) Geolocation.clearWatch(watchIdRef.current);
       socketService.off('NEW_ORDER_AVAILABLE');
     };
@@ -199,69 +187,99 @@ const AvailableOrdersScreen = ({ navigation }) => {
   // ─── Render order card ───────────────────────────────────────────────────────
   const renderOrderCard = ({ item: order }) => (
     <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <Text style={styles.orderId}>📦 Đơn #{order.id}</Text>
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceText}>
-            {order.distance_to_store != null
-              ? `📍 ${order.distance_to_store} km`
-              : `📏 ${Number(order.distance_km ?? 0).toFixed(1)} km`}
-          </Text>
-        </View>
-      </View>
+      {/* Left accent bar */}
+      <View style={styles.cardAccent} />
 
-      {/* Store info */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>🏪 Cửa hàng:</Text>
-        <Text style={styles.infoValue} numberOfLines={1}>
-          {order.store?.name || '—'}
-        </Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>📍 Địa chỉ CH:</Text>
-        <Text style={styles.infoValue} numberOfLines={2}>
-          {order.store?.address || '—'}
-        </Text>
-      </View>
-
-      {/* Delivery info */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>🚚 Giao đến:</Text>
-        <Text style={styles.infoValue} numberOfLines={2}>
-          {order.delivery_address}
-        </Text>
-      </View>
-
-      {/* Money */}
-      <View style={styles.moneyRow}>
-        <Text style={styles.moneyItem}>
-          💰 {Number(order.total_price).toLocaleString('vi-VN')} đ
-        </Text>
-        <Text style={styles.moneyItem}>
-          🛵 +{Number(order.shipping_fee).toLocaleString('vi-VN')} đ
-        </Text>
-      </View>
-
-      {/* Items preview */}
-      {order.items?.length > 0 && (
-        <View style={styles.itemsBlock}>
-          {order.items.slice(0, 2).map((it, idx) => (
-            <Text key={idx} style={styles.itemText}>
-              • {it.food?.name} × {it.quantity}
+      <View style={styles.cardContent}>
+        {/* Header row */}
+        <View style={styles.orderHeader}>
+          <View style={styles.orderIdRow}>
+            <Text style={styles.orderIdLabel}>ĐƠN HÀNG</Text>
+            <Text style={styles.orderId}>#{order.id}</Text>
+          </View>
+          <View style={styles.distanceBadge}>
+            <Text style={styles.distanceText}>
+              {order.distance_to_store != null
+                ? `${parseFloat(order.distance_to_store).toFixed(1)} km`
+                : `${Number(order.distance_km ?? 0).toFixed(1)} km`}
             </Text>
-          ))}
-          {order.items.length > 2 && (
-            <Text style={styles.moreItems}>+{order.items.length - 2} món khác</Text>
-          )}
+          </View>
         </View>
-      )}
 
-      <TouchableOpacity
-        style={styles.acceptBtn}
-        onPress={() => handleAcceptOrder(order)}
-      >
-        <Text style={styles.acceptBtnText}>✅ Nhận đơn</Text>
-      </TouchableOpacity>
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Store info */}
+        <View style={styles.infoRow}>
+          <Text style={styles.infoIcon}>🏪</Text>
+          <View style={styles.infoTextBlock}>
+            <Text style={styles.infoLabel}>Cửa hàng</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {order.store?.name || '—'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoIcon}>📍</Text>
+          <View style={styles.infoTextBlock}>
+            <Text style={styles.infoLabel}>Địa chỉ lấy hàng</Text>
+            <Text style={styles.infoValue} numberOfLines={2}>
+              {order.store?.address || '—'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoIcon}>🏠</Text>
+          <View style={styles.infoTextBlock}>
+            <Text style={styles.infoLabel}>Giao đến</Text>
+            <Text style={styles.infoValue} numberOfLines={2}>
+              {order.delivery_address}
+            </Text>
+          </View>
+        </View>
+
+        {/* Money row */}
+        <View style={styles.moneyRow}>
+          <View style={styles.moneyBlock}>
+            <Text style={styles.moneyLabel}>Tiền hàng</Text>
+            <Text style={styles.moneyValue}>
+              {Number(order.total_price).toLocaleString('vi-VN')} đ
+            </Text>
+          </View>
+          <View style={styles.moneyDivider} />
+          <View style={styles.moneyBlock}>
+            <Text style={styles.moneyLabel}>Phí giao</Text>
+            <Text style={[styles.moneyValue, { color: PRIMARY }]}>
+              +{Number(order.shipping_fee).toLocaleString('vi-VN')} đ
+            </Text>
+          </View>
+        </View>
+
+        {/* Items preview */}
+        {order.items?.length > 0 && (
+          <View style={styles.itemsBlock}>
+            {order.items.slice(0, 2).map((it, idx) => (
+              <Text key={idx} style={styles.itemText}>
+                • {it.food?.name} × {it.quantity}
+              </Text>
+            ))}
+            {order.items.length > 2 && (
+              <Text style={styles.moreItems}>+{order.items.length - 2} món khác</Text>
+            )}
+          </View>
+        )}
+
+        {/* Accept button */}
+        <TouchableOpacity
+          style={styles.acceptBtn}
+          onPress={() => handleAcceptOrder(order)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.acceptBtnText}>Nhận đơn ngay</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -277,33 +295,47 @@ const AvailableOrdersScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* ── Online status bar ── */}
-      <View style={[styles.statusBar, isOnline ? styles.statusOnline : styles.statusOffline]}>
-        <Text style={styles.statusText}>
-          {isOnline ? '🟢 Đang hoạt động' : '🔴 Ngoại tuyến'}
-        </Text>
+      <StatusBar backgroundColor={PRIMARY} barStyle="light-content" />
+
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Đơn hàng gần bạn</Text>
+          <Text style={styles.headerSubtitle}>
+            {orders.length > 0
+              ? `${orders.length} đơn trong bán kính ${SEARCH_RADIUS_KM}km`
+              : `Tìm kiếm trong ${SEARCH_RADIUS_KM}km…`}
+          </Text>
+        </View>
         <TouchableOpacity
-          style={styles.toggleBtn}
+          style={[styles.onlineToggle, isOnline ? styles.onlineToggleOn : styles.onlineToggleOff]}
           onPress={handleToggleOnline}
           disabled={togglingOnline}
         >
           {togglingOnline ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.toggleBtnText}>
-              {isOnline ? 'Tắt' : 'Bật'}
-            </Text>
+            <Text style={styles.onlineToggleText}>{isOnline ? '● Trực tuyến' : '○ Ngoại tuyến'}</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* ── OSM mini map showing stores ── */}
+      {/* ── GPS notice ── */}
+      {!currentLocation && (
+        <View style={styles.gpsBar}>
+          <ActivityIndicator size="small" color={PRIMARY} />
+          <Text style={styles.gpsText}>  Đang lấy vị trí GPS…</Text>
+        </View>
+      )}
+
+      {/* ── OSM mini map ── */}
       <OsmMap
         style={styles.map}
         region={mapRegion}
+        webViewRef={mapWebViewRef}
         markers={[
           ...(currentLocation
-            ? [{ id: 'driver', coordinate: currentLocation, title: 'Tôi 🛵', color: '#2196F3' }]
+            ? [{ id: 'driver', coordinate: currentLocation, title: 'Tôi', type: 'driver', color: '#2196F3' }]
             : []),
           ...orders
             .filter((o) => o.store?.lat && o.store?.lng)
@@ -313,33 +345,25 @@ const AvailableOrdersScreen = ({ navigation }) => {
                 latitude: parseFloat(o.store.lat),
                 longitude: parseFloat(o.store.lng),
               },
-              title: `🏪 ${o.store.name} – ${o.distance_to_store ?? '?'}km`,
+              title: `${o.store.name} – ${o.distance_to_store ?? '?'}km`,
+              type: 'store',
               color: '#E53935',
             })),
         ]}
       />
 
-      {/* ── Header ── */}
-      <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>
-          🛍️ Đơn trong {SEARCH_RADIUS_KM}km {orders.length > 0 ? `(${orders.length})` : ''}
-        </Text>
-        {!currentLocation && (
-          <Text style={styles.gpsWaiting}>⏳ Đang lấy vị trí GPS…</Text>
-        )}
-      </View>
-
       {/* ── Order list ── */}
       {loading && orders.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#0066cc" />
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.loadingText}>Đang tải đơn hàng…</Text>
         </View>
       ) : (
         <FlatList
           data={orders}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderOrderCard}
-          contentContainerStyle={{ padding: 10, paddingBottom: 20 }}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -347,15 +371,17 @@ const AvailableOrdersScreen = ({ navigation }) => {
                 setRefreshing(true);
                 fetchAvailableOrders();
               }}
-              colors={['#0066cc']}
+              colors={[PRIMARY]}
+              tintColor={PRIMARY}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
               <Text style={styles.emptyText}>
                 {currentLocation
-                  ? `Không có đơn hàng nào trong ${SEARCH_RADIUS_KM}km`
+                  ? `Không có đơn trong ${SEARCH_RADIUS_KM}km. Kéo xuống để làm mới.`
                   : 'Đang tìm kiếm đơn hàng gần bạn…'}
               </Text>
             </View>
@@ -367,130 +393,150 @@ const AvailableOrdersScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  container: { flex: 1, backgroundColor: '#f7f7f7' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
 
-  // Status bar
-  statusBar: {
+  // ── Header ──
+  header: {
+    backgroundColor: PRIMARY,
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    elevation: 4,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  statusOnline: { backgroundColor: '#e8f5e9' },
-  statusOffline: { backgroundColor: '#fce4ec' },
-  statusText: { fontSize: 14, fontWeight: '600', color: '#333' },
-  toggleBtn: {
-    backgroundColor: '#0066cc',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+
+  onlineToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
-    minWidth: 50,
+    minWidth: 110,
     alignItems: 'center',
   },
-  toggleBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  onlineToggleOn: { backgroundColor: '#27ae60' },
+  onlineToggleOff: { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  onlineToggleText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // Map
+  // ── GPS bar ──
+  gpsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY_LIGHT,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffd6c2',
+  },
+  gpsText: { fontSize: 13, color: PRIMARY, fontWeight: '500' },
+
+  // ── Map ──
   map: { height: 220, width: '100%' },
 
-  // Driver marker
-  driverMarker: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 3,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
+  // ── List ──
+  listContent: { padding: 12, paddingBottom: 24 },
 
-  // Store marker
-  storeMarker: {
-    backgroundColor: '#fff8e1',
-    borderRadius: 10,
-    padding: 3,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#ff9500',
-    minWidth: 44,
-  },
-  markerLabel: { fontSize: 9, color: '#ff9500', fontWeight: 'bold' },
-
-  // List header
-  listHeader: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  listTitle: { fontSize: 15, fontWeight: 'bold', color: '#222' },
-  gpsWaiting: { fontSize: 12, color: '#ff9500' },
-
-  // Order card
+  // ── Order card ──
   orderCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    elevation: 2,
+    borderRadius: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
+  cardAccent: {
+    width: 4,
+    backgroundColor: PRIMARY,
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
+  },
+  cardContent: { flex: 1, padding: 14 },
+
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
-  orderId: { fontSize: 15, fontWeight: 'bold', color: '#222' },
+  orderIdRow: { flexDirection: 'column' },
+  orderIdLabel: { fontSize: 10, color: '#aaa', fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase' },
+  orderId: { fontSize: 18, fontWeight: 'bold', color: '#222' },
+
   distanceBadge: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    backgroundColor: PRIMARY_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffd6c2',
   },
-  distanceText: { fontSize: 12, color: '#0066cc', fontWeight: '600' },
+  distanceText: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+
+  divider: { height: 1, backgroundColor: '#f0f0f0', marginBottom: 10 },
+
   infoRow: {
     flexDirection: 'row',
-    marginTop: 4,
     alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  infoLabel: { fontSize: 12, color: '#888', width: 90 },
-  infoValue: { fontSize: 12, color: '#333', flex: 1 },
+  infoIcon: { fontSize: 15, width: 24, marginTop: 1 },
+  infoTextBlock: { flex: 1 },
+  infoLabel: { fontSize: 11, color: '#aaa', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoValue: { fontSize: 13, color: '#333', marginTop: 1 },
+
   moneyRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  moneyItem: { fontSize: 13, fontWeight: '600', color: '#222' },
-  itemsBlock: { marginTop: 6 },
-  itemText: { fontSize: 12, color: '#555' },
-  moreItems: { fontSize: 12, color: '#999', fontStyle: 'italic' },
-  acceptBtn: {
-    marginTop: 12,
-    backgroundColor: '#0066cc',
-    paddingVertical: 12,
+    backgroundColor: '#fafafa',
     borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    marginBottom: 6,
     alignItems: 'center',
   },
-  acceptBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  moneyBlock: { flex: 1, alignItems: 'center' },
+  moneyDivider: { width: 1, height: 30, backgroundColor: '#eee' },
+  moneyLabel: { fontSize: 11, color: '#aaa', fontWeight: '600', marginBottom: 2 },
+  moneyValue: { fontSize: 14, fontWeight: 'bold', color: '#222' },
 
-  // Empty
-  emptyContainer: { alignItems: 'center', paddingVertical: 40 },
-  emptyIcon: { fontSize: 40, marginBottom: 10 },
-  emptyText: { fontSize: 15, color: '#999', textAlign: 'center' },
+  itemsBlock: {
+    backgroundColor: '#fafafa',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+  },
+  itemText: { fontSize: 12, color: '#555', lineHeight: 20 },
+  moreItems: { fontSize: 11, color: '#aaa', fontStyle: 'italic', marginTop: 2 },
+
+  acceptBtn: {
+    backgroundColor: PRIMARY,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  acceptBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+
+  // ── Empty ──
+  emptyContainer: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 30 },
+  emptyIcon: { fontSize: 52, marginBottom: 14 },
+  emptyTitle: { fontSize: 17, fontWeight: 'bold', color: '#444', marginBottom: 6 },
+  emptyText: { fontSize: 14, color: '#999', textAlign: 'center', lineHeight: 20 },
 });
 
 export default AvailableOrdersScreen;

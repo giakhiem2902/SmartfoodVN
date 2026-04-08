@@ -1,11 +1,3 @@
-/**
- * ActiveDeliveriesScreen
- * ──────────────────────
- * • Danh sách đơn hàng driver đang nhận (DRIVER_ACCEPTED / PICKING_UP / DELIVERING)
- * • Status timeline trực quan: Đã nhận → Đang lấy hàng → Đang giao → Hoàn thành
- * • Real-time cập nhật qua Socket.IO
- * • Nút mở DeliveryMapScreen với route OSM/OSRM
- */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -16,23 +8,27 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
 import { useAuthStore, useDriverStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
 import socketService from '../services/socketService';
 
-// ─── Status flow (same as DeliveryMapScreen) ─────────────────────────────────
+const PRIMARY = '#ff6b35';
+const PRIMARY_LIGHT = '#fff3ee';
+
+// ─── Status flow ─────────────────────────────────────────────────────────────
 const STATUS_FLOW = [
-  { key: 'DRIVER_ACCEPTED', label: 'Đã nhận đơn',   icon: '✅', color: '#0066cc' },
-  { key: 'PICKING_UP',      label: 'Lấy hàng',       icon: '🏪', color: '#ff9500' },
-  { key: 'DELIVERING',      label: 'Đang giao',       icon: '🛵', color: '#9b59b6' },
-  { key: 'COMPLETED',       label: 'Hoàn thành',      icon: '🎉', color: '#00cc66' },
+  { key: 'DRIVER_ACCEPTED', label: 'Đã nhận đơn',  icon: '✓',  color: PRIMARY },
+  { key: 'PICKING_UP',      label: 'Lấy hàng',      icon: '🏪', color: '#f39c12' },
+  { key: 'DELIVERING',      label: 'Đang giao',      icon: '🛵', color: '#8e44ad' },
+  { key: 'COMPLETED',       label: 'Hoàn thành',     icon: '✓',  color: '#27ae60' },
 ];
 
 const STATUS_ACTIONS = {
-  DRIVER_ACCEPTED: { label: '📍 Bắt đầu lấy hàng', next: 'PICKING_UP', color: '#ff9500' },
-  PICKING_UP:      { label: '🛵 Bắt đầu giao hàng', next: 'DELIVERING', color: '#9b59b6' },
-  DELIVERING:      { label: '✅ Đã giao hàng',       next: 'COMPLETED',  color: '#00cc66' },
+  DRIVER_ACCEPTED: { label: 'Bắt đầu lấy hàng', next: 'PICKING_UP',  color: '#f39c12' },
+  PICKING_UP:      { label: 'Bắt đầu giao hàng', next: 'DELIVERING', color: '#8e44ad' },
+  DELIVERING:      { label: 'Đã giao thành công', next: 'COMPLETED',  color: '#27ae60' },
 };
 
 const getStatusConfig = (status) => STATUS_FLOW.find((s) => s.key === status);
@@ -51,17 +47,19 @@ const StatusTimeline = ({ currentStatus }) => {
               <View
                 style={[
                   tStyles.dot,
-                  passed && tStyles.dotPassed,
-                  active && { backgroundColor: s.color, borderColor: s.color },
+                  passed && { backgroundColor: s.color, borderColor: s.color },
+                  active && { backgroundColor: s.color, borderColor: s.color, transform: [{ scale: 1.15 }] },
                 ]}
               >
-                <Text style={tStyles.dotText}>{passed ? '✓' : s.icon}</Text>
+                <Text style={[tStyles.dotText, (passed || active) && { color: '#fff' }]}>
+                  {passed || active ? s.icon : String(i + 1)}
+                </Text>
               </View>
               <Text
                 style={[
                   tStyles.label,
-                  active && { color: s.color, fontWeight: 'bold' },
-                  passed && tStyles.labelPassed,
+                  active && { color: s.color, fontWeight: '700' },
+                  passed && { color: s.color },
                 ]}
                 numberOfLines={2}
               >
@@ -69,7 +67,7 @@ const StatusTimeline = ({ currentStatus }) => {
               </Text>
             </View>
             {i < STATUS_FLOW.length - 1 && (
-              <View style={[tStyles.line, passed && tStyles.linePassed]} />
+              <View style={[tStyles.line, passed && { backgroundColor: s.color }]} />
             )}
           </React.Fragment>
         );
@@ -79,24 +77,22 @@ const StatusTimeline = ({ currentStatus }) => {
 };
 
 const tStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 10 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 14, paddingHorizontal: 4 },
   step: { alignItems: 'center', flex: 1 },
   dot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f0f0f0',
     borderWidth: 2,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 1,
   },
-  dotPassed: { backgroundColor: '#e8f5e9', borderColor: '#00cc66' },
-  dotText: { fontSize: 11 },
-  label: { fontSize: 9, color: '#aaa', marginTop: 4, textAlign: 'center' },
-  labelPassed: { color: '#00cc66' },
-  line: { flex: 0.3, height: 2, backgroundColor: '#ddd', marginTop: 14 },
-  linePassed: { backgroundColor: '#00cc66' },
+  dotText: { fontSize: 12, fontWeight: 'bold', color: '#bbb' },
+  label: { fontSize: 9, color: '#bbb', marginTop: 5, textAlign: 'center', lineHeight: 12 },
+  line: { flex: 0.25, height: 2, backgroundColor: '#eee', marginTop: 15 },
 });
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -192,96 +188,104 @@ const ActiveDeliveriesScreen = ({ navigation }) => {
 
     return (
       <View style={[styles.card, isCompleted && styles.cardCompleted]}>
-        {/* Header */}
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardOrderId}>📦 Đơn #{order.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusCfg?.color + '22' }]}>
-            <Text style={[styles.statusBadgeText, { color: statusCfg?.color }]}>
-              {statusCfg?.icon} {statusCfg?.label}
-            </Text>
-          </View>
-        </View>
+        {/* Top accent strip */}
+        <View style={[styles.cardStrip, { backgroundColor: statusCfg?.color || PRIMARY }]} />
 
-        {/* Timeline */}
-        <StatusTimeline currentStatus={order.status} />
-
-        {/* Store */}
-        <View style={styles.infoBlock}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>🏪</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.infoTitle}>{order.store?.name || 'Cửa hàng'}</Text>
-              <Text style={styles.infoSub}>{order.store?.address}</Text>
+        <View style={styles.cardBody}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={styles.cardIdLabel}>ĐƠN HÀNG</Text>
+              <Text style={styles.cardId}>#{order.id}</Text>
             </View>
-          </View>
-          <View style={[styles.infoRow, { marginTop: 6 }]}>
-            <Text style={styles.infoIcon}>📍</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.infoTitle}>Địa chỉ giao</Text>
-              <Text style={styles.infoSub}>{order.delivery_address}</Text>
-            </View>
-          </View>
-          {order.user && (
-            <View style={[styles.infoRow, { marginTop: 6 }]}>
-              <Text style={styles.infoIcon}>�</Text>
-              <Text style={styles.infoSub}>
-                {order.user.username}
-                {order.user.phone ? ` · ${order.user.phone}` : ''}
+            <View style={[styles.statusBadge, { backgroundColor: (statusCfg?.color || PRIMARY) + '22', borderColor: (statusCfg?.color || PRIMARY) + '55' }]}>
+              <Text style={[styles.statusBadgeText, { color: statusCfg?.color || PRIMARY }]}>
+                {statusCfg?.label || order.status}
               </Text>
+            </View>
+          </View>
+
+          {/* Timeline */}
+          <StatusTimeline currentStatus={order.status} />
+
+          {/* Info block */}
+          <View style={styles.infoBlock}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoIcon}>🏪</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoTitle}>{order.store?.name || 'Cửa hàng'}</Text>
+                <Text style={styles.infoSub} numberOfLines={2}>{order.store?.address}</Text>
+              </View>
+            </View>
+            <View style={styles.infoSeparator} />
+            <View style={styles.infoRow}>
+              <Text style={styles.infoIcon}>📍</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoTitle}>Giao đến</Text>
+                <Text style={styles.infoSub} numberOfLines={2}>{order.delivery_address}</Text>
+              </View>
+            </View>
+            {order.user && (
+              <>
+                <View style={styles.infoSeparator} />
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}>👤</Text>
+                  <Text style={styles.infoSub}>
+                    {order.user.username}
+                    {order.user.phone ? ` · ${order.user.phone}` : ''}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Meta row */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaLabel}>Tiền hàng</Text>
+              <Text style={styles.metaValue}>{Number(order.total_price).toLocaleString('vi-VN')} đ</Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaLabel}>Phí giao</Text>
+              <Text style={[styles.metaValue, { color: PRIMARY }]}>+{Number(order.shipping_fee).toLocaleString('vi-VN')} đ</Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaLabel}>Khoảng cách</Text>
+              <Text style={styles.metaValue}>{Number(order.distance_km).toFixed(1)} km</Text>
+            </View>
+          </View>
+
+          {/* Buttons */}
+          {!isCompleted ? (
+            <View style={styles.btnRow}>
+              <TouchableOpacity
+                style={styles.mapBtn}
+                onPress={() => handleOpenMap(order)}
+              >
+                <Text style={styles.mapBtnText}>🗺️  Bản đồ</Text>
+              </TouchableOpacity>
+              {action && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: action.color }, isUpdating && styles.disabledBtn]}
+                  onPress={() => handleUpdateStatus(order, action.next)}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.actionBtnText}>{action.label}</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.completedBanner}>
+              <Text style={styles.completedText}>🎉  Đã giao thành công!</Text>
             </View>
           )}
         </View>
-
-        {/* Metadata */}
-        <View style={styles.metaRow}>
-          <Text style={styles.metaItem}>
-            💰 {Number(order.total_price).toLocaleString('vi-VN')} đ
-          </Text>
-          <Text style={styles.metaItem}>
-            📏 {Number(order.distance_km).toFixed(1)} km
-          </Text>
-          <Text style={styles.metaItem}>
-            🚚 +{Number(order.shipping_fee).toLocaleString('vi-VN')} đ
-          </Text>
-        </View>
-
-        {/* Buttons */}
-        {!isCompleted && (
-          <View style={styles.btnRow}>
-            {/* Open map */}
-            <TouchableOpacity
-              style={styles.mapBtn}
-              onPress={() => handleOpenMap(order)}
-            >
-              <Text style={styles.mapBtnText}>🗺️ Xem bản đồ</Text>
-            </TouchableOpacity>
-
-            {/* Status action */}
-            {action && (
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  { backgroundColor: action.color },
-                  isUpdating && styles.disabledBtn,
-                ]}
-                onPress={() => handleUpdateStatus(order, action.next)}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.actionBtnText}>{action.label}</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {isCompleted && (
-          <View style={styles.completedBanner}>
-            <Text style={styles.completedText}>🎉 Đơn hàng đã hoàn thành</Text>
-          </View>
-        )}
       </View>
     );
   };
@@ -290,144 +294,178 @@ const ActiveDeliveriesScreen = ({ navigation }) => {
   if (loading && acceptedOrders.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#0066cc" />
+        <StatusBar backgroundColor={PRIMARY} barStyle="light-content" />
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={styles.loadingText}>Đang tải đơn hàng…</Text>
       </View>
     );
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      data={acceptedOrders}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderOrderCard}
-      contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            fetchActiveOrders();
-          }}
-          colors={['#0066cc']}
-        />
-      }
-      ListHeaderComponent={
-        <Text style={styles.screenTitle}>🚚 Đơn hàng đang giao</Text>
-      }
-      ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyText}>Không có đơn hàng nào đang giao</Text>
-          <Text style={styles.emptyHint}>Nhận đơn từ tab "Đơn có sẵn"</Text>
-        </View>
-      }
-    />
+    <>
+      <StatusBar backgroundColor={PRIMARY} barStyle="light-content" />
+      <FlatList
+        style={styles.container}
+        data={acceptedOrders}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderOrderCard}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchActiveOrders();
+            }}
+            colors={[PRIMARY]}
+            tintColor={PRIMARY}
+          />
+        }
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.screenTitle}>Đơn hàng đang giao</Text>
+            {acceptedOrders.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>{acceptedOrders.length}</Text>
+              </View>
+            )}
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📭</Text>
+            <Text style={styles.emptyTitle}>Chưa có đơn đang giao</Text>
+            <Text style={styles.emptyHint}>Nhận đơn từ tab "Đơn có sẵn"</Text>
+          </View>
+        }
+      />
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f7f7f7' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  screenTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 12,
+  loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
+
+  listContent: { padding: 12, paddingBottom: 24 },
+
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
     marginTop: 4,
   },
+  screenTitle: { fontSize: 20, fontWeight: 'bold', color: '#222' },
+  countBadge: {
+    marginLeft: 8,
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  countText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
 
-  // Card
+  // ── Card ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 14,
-    padding: 14,
     marginBottom: 14,
+    overflow: 'hidden',
     elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
-  cardCompleted: { opacity: 0.75 },
+  cardCompleted: { opacity: 0.7 },
+  cardStrip: { height: 4 },
+  cardBody: { padding: 14 },
 
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
   },
-  cardOrderId: { fontSize: 15, fontWeight: 'bold', color: '#222' },
+  cardIdLabel: { fontSize: 10, color: '#aaa', fontWeight: '600', letterSpacing: 0.8 },
+  cardId: { fontSize: 20, fontWeight: 'bold', color: '#222', marginTop: 1 },
 
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  statusBadgeText: { fontSize: 12, fontWeight: '600' },
+  statusBadgeText: { fontSize: 12, fontWeight: '700' },
 
-  // Info block
+  // ── Info block ──
   infoBlock: {
     backgroundColor: '#fafafa',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
   },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  infoIcon: { fontSize: 16, marginRight: 8, marginTop: 1 },
-  infoTitle: { fontSize: 13, fontWeight: '600', color: '#333' },
-  infoSub: { fontSize: 12, color: '#666', marginTop: 1, flex: 1 },
+  infoSeparator: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 8 },
+  infoIcon: { fontSize: 15, marginRight: 8, marginTop: 2, width: 22 },
+  infoTitle: { fontSize: 12, fontWeight: '700', color: '#555', marginBottom: 1 },
+  infoSub: { fontSize: 13, color: '#333', lineHeight: 18 },
 
-  // Meta
+  // ── Meta row ──
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    flexWrap: 'wrap',
-    gap: 4,
+    backgroundColor: '#fafafa',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    alignItems: 'center',
   },
-  metaItem: { fontSize: 12, color: '#444' },
+  metaBlock: { flex: 1, alignItems: 'center' },
+  metaDivider: { width: 1, height: 28, backgroundColor: '#eee' },
+  metaLabel: { fontSize: 10, color: '#aaa', fontWeight: '600', marginBottom: 2 },
+  metaValue: { fontSize: 13, fontWeight: 'bold', color: '#333' },
 
-  // Buttons
-  btnRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
+  // ── Buttons ──
+  btnRow: { flexDirection: 'row', gap: 8 },
   mapBtn: {
     flex: 1,
-    paddingVertical: 11,
-    borderRadius: 9,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#0066cc',
+    borderColor: PRIMARY,
     alignItems: 'center',
   },
-  mapBtnText: { color: '#0066cc', fontWeight: '600', fontSize: 13 },
+  mapBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 13 },
   actionBtn: {
     flex: 2,
-    paddingVertical: 11,
-    borderRadius: 9,
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
+    elevation: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   actionBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
   disabledBtn: { opacity: 0.55 },
 
   completedBanner: {
-    marginTop: 10,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
-    paddingVertical: 10,
+    backgroundColor: '#e8f8ee',
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#b7e4c7',
   },
-  completedText: { color: '#00aa55', fontWeight: 'bold', fontSize: 14 },
+  completedText: { color: '#27ae60', fontWeight: 'bold', fontSize: 14 },
 
-  // Empty
-  emptyContainer: { alignItems: 'center', paddingVertical: 50 },
-  emptyIcon: { fontSize: 44, marginBottom: 10 },
-  emptyText: { fontSize: 16, color: '#888', fontWeight: '600' },
-  emptyHint: { fontSize: 13, color: '#aaa', marginTop: 4 },
+  // ── Empty ──
+  emptyContainer: { alignItems: 'center', paddingVertical: 70, paddingHorizontal: 30 },
+  emptyIcon: { fontSize: 52, marginBottom: 14 },
+  emptyTitle: { fontSize: 17, fontWeight: 'bold', color: '#444', marginBottom: 6 },
+  emptyHint: { fontSize: 14, color: '#aaa', textAlign: 'center' },
 });
 
 export default ActiveDeliveriesScreen;
