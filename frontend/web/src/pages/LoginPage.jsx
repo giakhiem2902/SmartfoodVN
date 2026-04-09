@@ -48,7 +48,6 @@ const LoginPage = () => {
         username: values.username,
         email: values.email,
         password: values.password,
-        role: values.role || 'user',
         phone: values.phone,
       });
 

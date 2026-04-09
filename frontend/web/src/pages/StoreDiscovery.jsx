@@ -56,8 +56,6 @@ const isStoreOpen = (opening, closing) => {
 const StoreDiscovery = ({ token, userLocation }) => {
   const navigate = useNavigate();
   const { userAddress } = useLocationStore();
-  
-  console.log('StoreDiscovery component rendered with userLocation:', userLocation);
 
   const [stores, setStores] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -208,7 +206,10 @@ const StoreDiscovery = ({ token, userLocation }) => {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60 }}>
-            <Spin size="large" tip="Đang tìm quán ăn..." />
+            <Spin size="large">
+              <div style={{ minHeight: 40 }} />
+            </Spin>
+            <div style={{ marginTop: 12, color: '#666' }}>Đang tìm quán ăn...</div>
           </div>
         ) : filtered.length === 0 ? (
           <Empty

@@ -2,6 +2,8 @@
 -- SEED DATA - SmartFood
 -- Địa điểm thực tế: Quận Thủ Đức (TP. Thủ Đức), TP.HCM
 -- ============================================================
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
 USE smartfood;
 
 -- ============================================================

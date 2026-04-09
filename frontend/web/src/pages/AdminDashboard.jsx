@@ -1,206 +1,145 @@
-import React, { useState, useEffect } from 'react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { Card, Row, Col, Statistic, Table, Button, Space, Tag } from 'antd';
-import { DollarOutlined, ShoppingOutlined, CarOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import socketService from '../services/socketService';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, message } from 'antd';
+import { CheckCircleOutlined, ClockCircleOutlined, ShopOutlined, StopOutlined } from '@ant-design/icons';
 import apiClient from '../services/apiClient';
 
-const AdminDashboard = ({ token, storeId }) => {
-  const [orders, setOrders] = useState([]);
-  const [revenueData, setRevenueData] = useState([]);
-  const [stats, setStats] = useState({
-    totalOrders: 0,
-    completedOrders: 0,
-    totalRevenue: 0,
-    activeDrivers: 0,
-  });
+const { Title, Text } = Typography;
+const API_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '');
+
+export default function AdminDashboard() {
+  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadRegistrations = async () => {
+    try {
+      setLoading(true);
+      const res = await apiClient.getStoreRegistrations();
+      setRegistrations(Array.isArray(res) ? res : []);
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Không thể tải danh sách đăng ký cửa hàng');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Connect Socket.io
-    socketService.connect();
-    socketService.socket.emit('ADMIN_JOIN', { adminId: token });
+    loadRegistrations();
+  }, []);
 
-    // Listen for new orders
-    socketService.socket.on('NEW_ORDER', (order) => {
-      setOrders((prevOrders) => [order, ...prevOrders]);
-      updateStats();
-    });
+  const stats = useMemo(() => ({
+    total: registrations.length,
+    pending: registrations.filter((item) => item.status === 'PENDING').length,
+    approved: registrations.filter((item) => item.status === 'APPROVED').length,
+    rejected: registrations.filter((item) => item.status === 'REJECTED').length,
+  }), [registrations]);
 
-    socketService.socket.on('ORDER_STATUS_CHANGED', (data) => {
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order.id === data.orderId ? { ...order, status: data.status } : order
-        )
-      );
-      updateStats();
-    });
-
-    return () => {
-      socketService.socket.emit('ADMIN_LEAVE');
-    };
-  }, [token]);
-
-  const updateStats = async () => {
+  const handleReview = async (registration, status) => {
     try {
-      // Fetch and calculate stats
-      const response = await apiClient.getUserOrders(token);
-      if (response && Array.isArray(response)) {
-        const completedOrders = response.filter((o) => o.status === 'COMPLETED');
-        const totalRevenue = completedOrders.reduce((sum, o) => sum + o.total_price, 0);
+      const rejectionReason = status === 'REJECTED'
+        ? (window.prompt('Nhập lý do từ chối:', registration.rejection_reason || 'Thiếu thông tin xác minh') || 'Thiếu thông tin xác minh')
+        : '';
 
-        setStats({
-          totalOrders: response.length,
-          completedOrders: completedOrders.length,
-          totalRevenue,
-          activeDrivers: response.filter((o) => o.driver_id).length,
-        });
-      }
+      await apiClient.reviewStoreRegistration(registration.id, { status, rejectionReason });
+      message.success(status === 'APPROVED' ? 'Đã duyệt cửa hàng thành công' : 'Đã từ chối phiếu đăng ký');
+      loadRegistrations();
     } catch (error) {
-      console.error('Error updating stats:', error);
+      message.error(error.response?.data?.message || 'Không thể cập nhật phiếu đăng ký');
     }
   };
 
   const columns = [
     {
-      title: 'Order ID',
-      dataIndex: 'id',
-      key: 'id',
-    },
-    {
-      title: 'User',
-      dataIndex: ['user', 'username'],
+      title: 'Người gửi',
       key: 'user',
+      render: (_, record) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{record.user?.username || 'Người dùng'}</div>
+          <Text type="secondary">{record.user?.email}</Text>
+        </div>
+      ),
     },
     {
-      title: 'Status',
+      title: 'Tên cửa hàng',
+      dataIndex: 'store_name',
+      key: 'store_name',
+    },
+    {
+      title: 'Loại hàng',
+      dataIndex: 'business_type',
+      key: 'business_type',
+    },
+    {
+      title: 'Địa chỉ',
+      dataIndex: 'store_address',
+      key: 'store_address',
+      render: (value) => <div style={{ maxWidth: 240 }}>{value}</div>,
+    },
+    {
+      title: 'Ảnh cửa hàng',
+      dataIndex: 'store_image_url',
+      key: 'store_image_url',
+      render: (value) => value ? (
+        <img
+          src={value.startsWith('http') ? value : `${API_BASE}${value}`}
+          alt="store"
+          style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }}
+        />
+      ) : <Text type="secondary">Không có</Text>,
+    },
+    {
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        const colors = {
+        const color = {
           PENDING: 'orange',
-          CONFIRMED: 'blue',
-          FINDING_DRIVER: 'cyan',
-          DRIVER_ACCEPTED: 'green',
-          DELIVERING: 'blue',
-          COMPLETED: 'green',
-          CANCELLED: 'red',
+          APPROVED: 'green',
+          REJECTED: 'red',
         };
-        return <Tag color={colors[status]}>{status}</Tag>;
+        return <Tag color={color[status] || 'default'}>{status}</Tag>;
       },
     },
     {
-      title: 'Total Price',
-      dataIndex: 'total_price',
-      key: 'total_price',
-      render: (price) => `${price.toLocaleString()} đ`,
-    },
-    {
-      title: 'Distance',
-      dataIndex: 'distance_km',
-      key: 'distance_km',
-      render: (distance) => `${distance.toFixed(1)} km`,
+      title: 'Thao tác',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="primary"
+            size="small"
+            disabled={record.status === 'APPROVED'}
+            onClick={() => handleReview(record, 'APPROVED')}
+          >
+            Duyệt
+          </Button>
+          <Button
+            danger
+            size="small"
+            disabled={record.status === 'REJECTED'}
+            onClick={() => handleReview(record, 'REJECTED')}
+          >
+            Từ chối
+          </Button>
+        </Space>
+      ),
     },
   ];
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>📊 Admin Dashboard</h1>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+      <Title level={3} style={{ marginTop: 0 }}>📊 Admin Dashboard</Title>
+      <Text type="secondary">Xét duyệt các phiếu đăng ký cửa hàng và theo dõi tiến độ onboarding seller.</Text>
 
-      {/* Stats Cards */}
-      <Row gutter={16} style={{ marginBottom: '30px' }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Total Orders"
-              value={stats.totalOrders}
-              prefix={<ShoppingOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Completed Orders"
-              value={stats.completedOrders}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Total Revenue"
-              value={stats.totalRevenue}
-              prefix={<DollarOutlined />}
-              suffix="đ"
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Active Drivers"
-              value={stats.activeDrivers}
-              prefix={<CarOutlined />}
-            />
-          </Card>
-        </Col>
+      <Row gutter={[16, 16]} style={{ marginTop: 16, marginBottom: 16 }}>
+        <Col xs={24} md={6}><Card><Statistic title="Tổng phiếu" value={stats.total} prefix={<ShopOutlined />} /></Card></Col>
+        <Col xs={24} md={6}><Card><Statistic title="Chờ duyệt" value={stats.pending} prefix={<ClockCircleOutlined />} /></Card></Col>
+        <Col xs={24} md={6}><Card><Statistic title="Đã duyệt" value={stats.approved} prefix={<CheckCircleOutlined />} /></Card></Col>
+        <Col xs={24} md={6}><Card><Statistic title="Từ chối" value={stats.rejected} prefix={<StopOutlined />} /></Card></Col>
       </Row>
 
-      {/* Charts */}
-      <Row gutter={16}>
-        <Col xs={24} md={12}>
-          <Card title="Daily Revenue">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-        <Col xs={24} md={12}>
-          <Card title="Order Status Distribution">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="status" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Orders Table */}
-      <Card title="Orders" style={{ marginTop: '30px' }}>
-        <Table
-          columns={columns}
-          dataSource={orders}
-          pagination={{ pageSize: 10 }}
-          rowKey="id"
-        />
+      <Card title="Phiếu đăng ký cửa hàng" variant="borderless" style={{ borderRadius: 16 }}>
+        <Table rowKey="id" loading={loading} columns={columns} dataSource={registrations} scroll={{ x: 900 }} />
       </Card>
     </div>
   );
-};
-
-export default AdminDashboard;
+}

@@ -5,12 +5,12 @@ const authorize = require('../middleware/authorize');
 
 const router = express.Router();
 
-// User orders
-router.post('/checkout', auth, authorize('user'), orderController.checkout);
-router.get('/my-orders', auth, authorize('user'), orderController.getUserOrders);
+// Personal orders for any logged-in account
+router.post('/checkout', auth, orderController.checkout);
+router.get('/my-orders', auth, orderController.getUserOrders);
 
 // Store orders
-router.get('/store/:storeId/orders', auth, authorize('store'), orderController.getStoreOrders);
+router.get('/store/:storeId/orders', auth, authorize('store', 'admin'), orderController.getStoreOrders);
 
 // Driver operations
 router.get('/available', auth, authorize('driver'), orderController.getAvailableOrders);

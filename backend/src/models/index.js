@@ -7,10 +7,14 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const DriverLocationHistory = require('./DriverLocationHistory');
 const Rating = require('./Rating');
+const StoreRegistration = require('./StoreRegistration');
 
 // Define Associations
 User.hasMany(Store, { foreignKey: 'owner_id', as: 'stores' });
 Store.belongsTo(User, { foreignKey: 'owner_id', as: 'owner' });
+
+User.hasMany(StoreRegistration, { foreignKey: 'user_id', as: 'store_registrations' });
+StoreRegistration.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 Store.hasMany(Category, { foreignKey: 'store_id', as: 'categories' });
 Category.belongsTo(Store, { foreignKey: 'store_id' });
@@ -62,4 +66,5 @@ module.exports = {
   OrderItem,
   DriverLocationHistory,
   Rating,
+  StoreRegistration,
 };

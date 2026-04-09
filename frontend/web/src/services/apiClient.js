@@ -5,12 +5,13 @@ const getToken = () => localStorage.getItem('token');
 
 // Helper: gọi API với JSON body
 const request = async (method, path, body = null, token = null) => {
-  const headers = { 'Content-Type': 'application/json' };
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers = isFormData ? {} : { 'Content-Type': 'application/json' };
   if (token || getToken()) {
     headers['Authorization'] = `Bearer ${token || getToken()}`;
   }
   const options = { method, headers };
-  if (body) options.body = JSON.stringify(body);
+  if (body) options.body = isFormData ? body : JSON.stringify(body);
 
   const response = await fetch(`${API_BASE_URL}${path}`, options);
   const json = await response.json();
@@ -108,12 +109,45 @@ const apiClient = {
     return request('GET', `/stores/${storeId}`);
   },
 
+  async getMyStore() {
+    return request('GET', '/stores/my-store');
+  },
+
   async getStoreFoods(storeId) {
     return request('GET', `/stores/${storeId}/foods`);
   },
 
   async getStoreCategories(storeId) {
     return request('GET', `/stores/${storeId}/categories`);
+  },
+
+  async createStoreCategory(storeId, formData) {
+    return request('POST', `/stores/${storeId}/categories`, formData);
+  },
+
+  async createStoreFood(storeId, formData) {
+    return request('POST', `/stores/${storeId}/foods`, formData);
+  },
+
+  async updateFoodAvailability(foodId, is_available) {
+    return request('PATCH', `/stores/foods/${foodId}/availability`, { is_available });
+  },
+
+  async submitStoreRegistration(formData) {
+    return request('POST', '/stores/registrations', formData);
+  },
+
+  async getMyStoreRegistration() {
+    return request('GET', '/stores/registrations/my');
+  },
+
+  async getStoreRegistrations(status = '') {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request('GET', `/stores/registrations${suffix}`);
+  },
+
+  async reviewStoreRegistration(registrationId, payload) {
+    return request('PATCH', `/stores/registrations/${registrationId}/review`, payload);
   },
 
   // ==================== ORDERS ====================
@@ -131,6 +165,14 @@ const apiClient = {
 
   async getUserOrders() {
     return request('GET', '/orders/my-orders');
+  },
+
+  async getStoreOrders(storeId) {
+    return request('GET', `/orders/store/${storeId}/orders`);
+  },
+
+  async updateOrderStatus(orderId, status) {
+    return request('PUT', `/orders/${orderId}/status`, { status });
   },
 
   // ==================== GENERIC (dùng trong SecuritySettingsPage) ====================

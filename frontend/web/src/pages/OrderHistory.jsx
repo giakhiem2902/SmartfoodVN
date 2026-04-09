@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Card, Table, Button, Tag, Spin, message, Empty, Space, Modal, Typography, Divider, Image
 } from 'antd';
@@ -26,27 +26,37 @@ const OrderHistory = () => {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const response = await apiClient.getUserOrders();
       // Response is already unwrapped array by apiClient
       setOrders(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      message.error('Không thể tải lịch sử đơn hàng');
+      if (!silent) {
+        message.error('Không thể tải lịch sử đơn hàng');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+
+    const intervalId = window.setInterval(() => {
+      fetchOrders(true);
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchOrders]);
 
   const handleViewDetails = (order) => {
-    console.log('Selected Order:', order);
-    console.log('Store data:', order.store);
     setSelectedOrder(order);
     setDetailsVisible(true);
   };
@@ -60,18 +70,20 @@ const OrderHistory = () => {
     CONFIRMED: 'blue',
     FINDING_DRIVER: 'cyan',
     DRIVER_ACCEPTED: 'green',
+    PICKING_UP: 'purple',
     DELIVERING: 'blue',
     COMPLETED: 'green',
     CANCELLED: 'red',
   };
 
   const statusTexts = {
-    PENDING: 'Chờ xác nhận',
-    CONFIRMED: 'Đã xác nhận',
-    FINDING_DRIVER: 'Tìm tài xế',
-    DRIVER_ACCEPTED: 'Tài xế nhận',
-    DELIVERING: 'Đang giao',
-    COMPLETED: 'Hoàn thành',
+    PENDING: 'Đợi cửa hàng xác nhận',
+    CONFIRMED: 'Quán đang làm món cho bạn',
+    FINDING_DRIVER: 'Quán đang tìm tài xế',
+    DRIVER_ACCEPTED: 'Tài xế đã nhận đơn',
+    PICKING_UP: 'Tài xế đang lấy hàng tại quán',
+    DELIVERING: 'Tài xế đang giao cho bạn',
+    COMPLETED: 'Đã hoàn thành',
     CANCELLED: 'Đã hủy',
   };
 
@@ -144,7 +156,7 @@ const OrderHistory = () => {
           >
             Chi tiết
           </Button>
-          {record.status === 'PENDING' || record.status === 'CONFIRMED' || record.status === 'FINDING_DRIVER' ? (
+          {['PENDING', 'CONFIRMED', 'FINDING_DRIVER'].includes(record.status) ? (
             <Button
               danger
               size="small"
@@ -153,7 +165,7 @@ const OrderHistory = () => {
             >
               Hủy
             </Button>
-          ) : record.status === 'DELIVERING' || record.status === 'DRIVER_ACCEPTED' ? (
+          ) : ['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING'].includes(record.status) ? (
             <Button
               type="primary"
               size="small"
@@ -229,7 +241,7 @@ const OrderHistory = () => {
           <Button key="close" onClick={() => setDetailsVisible(false)}>
             Đóng
           </Button>,
-          selectedOrder?.status === 'DELIVERING' || selectedOrder?.status === 'DRIVER_ACCEPTED' ? (
+          ['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING'].includes(selectedOrder?.status) ? (
             <Button
               key="track"
               type="primary"
