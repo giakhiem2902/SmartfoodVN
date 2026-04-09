@@ -365,6 +365,40 @@ const getDailyRevenue = async (req, res, next) => {
   }
 };
 
+// Get driver stats for today
+const getDriverStats = async (req, res, next) => {
+  try {
+    const driverId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+
+    const statsData = await sequelize.query(`
+      SELECT 
+        COUNT(DISTINCT o.id) as totalOrders,
+        SUM(CASE WHEN o.status = 'COMPLETED' THEN 1 ELSE 0 END) as completedOrders,
+        COALESCE(SUM(CASE WHEN o.status = 'COMPLETED' THEN o.shipping_fee ELSE 0 END), 0) as earnings
+      FROM orders o
+      WHERE o.driver_id = :driverId
+      AND DATE(o.created_at) = :date
+    `, {
+      replacements: { driverId, date: today },
+      type: sequelize.QueryTypes.SELECT,
+    });
+
+    const result = statsData[0] || { totalOrders: 0, completedOrders: 0, earnings: 0 };
+    console.log('[getDriverStats] Driver:', driverId, 'Date:', today, 'Result:', result);
+
+    // Ensure proper types
+    sendSuccess(res, {
+      totalOrders: parseInt(result.totalOrders) || 0,
+      completedOrders: parseInt(result.completedOrders) || 0,
+      earnings: parseFloat(result.earnings) || 0,
+    });
+  } catch (error) {
+    console.error('[getDriverStats] Error:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   checkout,
   getOrder,
@@ -375,4 +409,5 @@ module.exports = {
   getAvailableOrders,
   getDriverOrders,
   getDailyRevenue,
+  getDriverStats,
 };
