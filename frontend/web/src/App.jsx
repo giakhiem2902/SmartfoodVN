@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Dropdown, Card, Tag, Spin, Row, Col, Empty, Divider } from 'antd';
 import { LogoutOutlined, UserOutlined, ShoppingCartOutlined, UserSwitchOutlined, SafetyOutlined, TruckOutlined, ShopOutlined } from '@ant-design/icons';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -33,6 +33,7 @@ function MainLayout() {
   const { userLocation, userAddress, setUserLocation, setUserAddress } = useLocationStore();
   const { cart } = useOrderStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [trackingOrders, setTrackingOrders] = useState([]);
@@ -135,6 +136,30 @@ function MainLayout() {
     setTrackingModalOpen(true);
   };
 
+  const headerNavItems = [
+    { key: 'home', label: 'Trang chủ', path: '/' },
+    { key: 'stores', label: 'Quán ăn', path: '/stores' },
+    { key: 'orders', label: 'Đơn hàng của tôi', path: '/orders' },
+    ...(user?.role === 'user'
+      ? [{ key: 'become-store', label: 'Đăng ký bán hàng', path: '/become-store' }]
+      : []),
+    ...(user?.role === 'store'
+      ? [
+          { key: 'store-dashboard', label: 'Quản lý cửa hàng', path: '/store-dashboard' },
+          { key: 'store-tracking', label: 'Theo dõi đơn hàng', action: handleOpenTrackingModal },
+        ]
+      : []),
+    ...(user?.role === 'admin'
+      ? [
+          { key: 'admin', label: 'Quản trị', path: '/admin' },
+          { key: 'admin-tracking', label: 'Theo dõi đơn hàng', action: handleOpenTrackingModal },
+        ]
+      : []),
+    ...(user?.role === 'driver'
+      ? [{ key: 'driver-tracking', label: 'Theo dõi đơn hàng', action: handleOpenTrackingModal }]
+      : []),
+  ];
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
@@ -144,7 +169,7 @@ function MainLayout() {
         padding: '0 24px', position: 'sticky', top: 0, zIndex: 100,
       }}>
         {/* Logo + nav */}
-        <Space size={32} align="center">
+        <Space size={32} align="center" wrap>
           <div
             style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
             onClick={() => navigate('/')}
@@ -154,18 +179,30 @@ function MainLayout() {
               SmartFood
             </span>
           </div>
-          <Space size={4}>
-            <Button type="text" style={{ color: '#333', fontWeight: 500 }} onClick={() => navigate('/')}>
-              Trang chủ
-            </Button>
-            <Button type="text" style={{ color: '#333', fontWeight: 500 }} onClick={() => navigate('/stores')}>
-              Quán ăn
-            </Button>
-            {user?.role === 'admin' && (
-              <Button type="text" style={{ color: '#333', fontWeight: 500 }} onClick={() => navigate('/admin')}>
-                Quản trị
-              </Button>
-            )}
+          <Space size={4} wrap>
+            {headerNavItems.map((item) => {
+              const isActive = item.path
+                ? item.path === '/'
+                  ? location.pathname === '/'
+                  : location.pathname.startsWith(item.path)
+                : false;
+
+              return (
+                <Button
+                  key={item.key}
+                  type="text"
+                  style={{
+                    color: isActive ? '#ff6b35' : '#333',
+                    fontWeight: isActive ? 700 : 500,
+                    background: isActive ? '#fff3eb' : 'transparent',
+                    borderRadius: 999,
+                  }}
+                  onClick={() => (item.action ? item.action() : navigate(item.path))}
+                >
+                  {item.label}
+                </Button>
+              );
+            })}
           </Space>
         </Space>
 

@@ -179,7 +179,7 @@ const updateStatus = async (req, res, next) => {
       COMPLETED: [],
       CANCELLED: [],
     };
-
+  
     if (!roleAllowedStatuses[req.user.role]?.includes(status)) {
       return sendError(res, 'This role cannot update to the requested status', 403);
     }
