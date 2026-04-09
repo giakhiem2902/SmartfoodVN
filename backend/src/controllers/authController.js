@@ -5,14 +5,14 @@ const { sendSuccess, sendError } = require('../utils/responseHandler');
 // Register
 const register = async (req, res, next) => {
   try {
-    const { username, email, password, role, phone } = req.body;
+    const { username, email, password, phone } = req.body;
 
     // Validation
     if (!username || !email || !password) {
       return sendError(res, 'Username, email, and password are required', 400);
     }
 
-    const result = await registerUser(username, email, password, role || 'user', phone);
+    const result = await registerUser(username, email, password, 'user', phone);
     sendSuccess(res, result, 'User registered successfully', 201);
   } catch (error) {
     next(error);

@@ -53,8 +53,13 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NULL;
 
 -- Tạo index nếu chưa có
-DROP INDEX IF EXISTS idx_google_id ON users;
-CREATE INDEX idx_google_id ON users(google_id);
+SET @idx = 'idx_google_id';
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND INDEX_NAME=@idx),
+  'SELECT "idx_google_id already exists"',
+  'CREATE INDEX idx_google_id ON users(google_id)'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Xem kết quả
 DESCRIBE users;

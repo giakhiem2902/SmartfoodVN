@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Button, Tag, Divider, Spin, message, Timeline, Row, Col, Typography, Space, Badge, Empty } from 'antd';
 import {
   EnvironmentOutlined, PhoneOutlined, ClockCircleOutlined, CheckCircleOutlined,
@@ -11,6 +11,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
 
+const STATUS_CONFIG = {
+  PENDING: { color: 'orange', text: '⏳ Đợi cửa hàng xác nhận', progress: 1 },
+  CONFIRMED: { color: 'blue', text: '👨‍🍳 Quán đang làm món cho bạn', progress: 2 },
+  FINDING_DRIVER: { color: 'cyan', text: '🔎 Quán đang tìm tài xế giao hàng', progress: 3 },
+  DRIVER_ACCEPTED: { color: 'green', text: '🤝 Tài xế đã nhận đơn từ quán', progress: 4 },
+  PICKING_UP: { color: 'purple', text: '🏪 Tài xế đang lấy món tại quán', progress: 5 },
+  DELIVERING: { color: 'blue', text: '🚚 Tài xế đang giao hàng đến bạn', progress: 6 },
+  COMPLETED: { color: 'green', text: '✅ Đơn hàng đã hoàn thành', progress: 7 },
+  CANCELLED: { color: 'red', text: '❌ Đơn hàng đã bị hủy', progress: 0 },
+};
+
 const OrderTracking = ({ token }) => {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -18,10 +29,29 @@ const OrderTracking = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [driverLocation, setDriverLocation] = useState(null);
 
+  const fetchOrder = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.getOrder(orderId);
+      // Response is already unwrapped by apiClient
+      if (response && response.id) {
+        setOrder(response);
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      message.error('Không thể tải thông tin đơn hàng');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
   useEffect(() => {
     fetchOrder();
     socketService.connect();
-  }, [orderId, token]);
+
+    const intervalId = window.setInterval(fetchOrder, 10000);
+    return () => window.clearInterval(intervalId);
+  }, [fetchOrder, token]);
 
   useEffect(() => {
     if (order) {
@@ -38,7 +68,7 @@ const OrderTracking = ({ token }) => {
       socketService.onOrderStatusChanged((data) => {
         if (data.orderId === parseInt(orderId)) {
           setOrder((prev) => ({ ...prev, status: data.status }));
-          message.success(`Trạng thái đơn hàng: ${data.status}`);
+          message.success(STATUS_CONFIG[data.status]?.text || `Trạng thái đơn hàng: ${data.status}`);
         }
       });
 
@@ -48,26 +78,11 @@ const OrderTracking = ({ token }) => {
     }
   }, [order, orderId]);
 
-  const fetchOrder = async () => {
-    try {
-      setLoading(true);
-      const response = await apiClient.getOrder(orderId);
-      // Response is already unwrapped by apiClient
-      if (response && response.id) {
-        setOrder(response);
-      }
-    } catch (error) {
-      console.error('Error fetching order:', error);
-      message.error('Không thể tải thông tin đơn hàng');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <Spin size="large" tip="Đang tải thông tin đơn hàng..." />
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px', flexDirection: 'column', gap: 12 }}>
+        <Spin size="large" />
+        <span style={{ color: '#666' }}>Đang tải thông tin đơn hàng...</span>
       </div>
     );
   }
@@ -83,20 +98,38 @@ const OrderTracking = ({ token }) => {
     );
   }
 
-  const statusConfig = {
-    PENDING: { color: 'orange', text: '⏳ Chờ xác nhận', progress: 1 },
-    CONFIRMED: { color: 'blue', text: '✅ Đã xác nhận', progress: 2 },
-    FINDING_DRIVER: { color: 'cyan', text: '🔍 Tìm tài xế', progress: 3 },
-    DRIVER_ACCEPTED: { color: 'green', text: '🤝 Tài xế đã nhận', progress: 4 },
-    DELIVERING: { color: 'blue', text: '🚚 Đang giao hàng', progress: 5 },
-    COMPLETED: { color: 'green', text: '✨ Đã hoàn thành', progress: 6 },
-    CANCELLED: { color: 'red', text: '❌ Đã hủy', progress: 0 },
-  };
+  const statusConfig = STATUS_CONFIG;
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    message.success('Đã sao chép');
-  };
+  const timelineItems = [
+    {
+      children: <span>Bạn đã đặt đơn lúc <strong>{new Date(order.created_at).toLocaleString('vi-VN')}</strong></span>,
+      dot: <CheckCircleOutlined style={{ fontSize: '16px', color: '#52c41a' }} />,
+    },
+    ['CONFIRMED', 'FINDING_DRIVER', 'DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING', 'COMPLETED'].includes(order.status) && {
+      children: <span>Cửa hàng đã xác nhận và <strong>đang làm món cho bạn</strong>.</span>,
+      color: 'blue',
+    },
+    ['FINDING_DRIVER', 'DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING', 'COMPLETED'].includes(order.status) && {
+      children: <span>Quán đã chuẩn bị xong và đang <strong>tìm tài xế giao hàng</strong>.</span>,
+      color: 'cyan',
+    },
+    ['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING', 'COMPLETED'].includes(order.status) && {
+      children: <span>Tài xế đã nhận đơn từ cửa hàng.</span>,
+      color: 'green',
+    },
+    ['PICKING_UP'].includes(order.status) && {
+      children: <span>Tài xế đang có mặt tại quán để lấy món.</span>,
+      color: 'purple',
+    },
+    ['DELIVERING', 'COMPLETED'].includes(order.status) && {
+      children: <span>Cửa hàng đã giao đơn cho tài xế và đơn đang được vận chuyển.</span>,
+      color: 'blue',
+    },
+    order.completed_at && {
+      children: <span>Đơn hàng được hoàn thành lúc <strong>{new Date(order.completed_at).toLocaleString('vi-VN')}</strong></span>,
+      dot: <CheckCircleOutlined style={{ fontSize: '16px', color: '#52c41a' }} />,
+    },
+  ].filter(Boolean);
 
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', padding: '20px 0' }}>
@@ -318,18 +351,7 @@ const OrderTracking = ({ token }) => {
                 <span style={{ fontSize: '20px' }}>⏱️</span>
                 <Typography.Title level={4} style={{ margin: 0 }}>Lịch sử đơn hàng</Typography.Title>
               </div>
-              <Timeline
-                items={[
-                  {
-                    children: <span>Đơn hàng được tạo lúc <strong>{new Date(order.created_at).toLocaleString('vi-VN')}</strong></span>,
-                    dot: <CheckCircleOutlined style={{ fontSize: '16px', color: '#52c41a' }} />,
-                  },
-                  order.completed_at && {
-                    children: <span>Đơn hàng được hoàn thành lúc <strong>{new Date(order.completed_at).toLocaleString('vi-VN')}</strong></span>,
-                    dot: <CheckCircleOutlined style={{ fontSize: '16px', color: '#52c41a' }} />,
-                  },
-                ].filter(Boolean)}
-              />
+              <Timeline items={timelineItems} />
             </Card>
           </Col>
         </Row>

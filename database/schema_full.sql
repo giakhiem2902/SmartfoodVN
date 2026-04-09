@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS foods (
   image_url        VARCHAR(500),
   is_available     BOOLEAN DEFAULT TRUE,
   is_featured      BOOLEAN DEFAULT FALSE,
+  is_hot           BOOLEAN DEFAULT FALSE,
   preparation_time INT DEFAULT 15 COMMENT 'in minutes',
   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -105,7 +106,7 @@ CREATE TABLE IF NOT EXISTS orders (
   driver_id        INT,
   status           ENUM(
                      'PENDING','CONFIRMED','FINDING_DRIVER',
-                     'DRIVER_ACCEPTED','DELIVERING','COMPLETED','CANCELLED'
+                     'DRIVER_ACCEPTED','PICKING_UP','DELIVERING','COMPLETED','CANCELLED'
                    ) DEFAULT 'PENDING',
   delivery_lat     DECIMAL(10,8) NOT NULL,
   delivery_lng     DECIMAL(11,8) NOT NULL,
@@ -184,6 +185,28 @@ CREATE TABLE IF NOT EXISTS ratings (
   INDEX idx_driver (driver_id),
   INDEX idx_store  (store_id),
   UNIQUE KEY unique_order_rating (order_id, user_id)
+);
+
+-- ============================================
+-- STORE REGISTRATIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS store_registrations (
+  id               INT PRIMARY KEY AUTO_INCREMENT,
+  user_id          INT NOT NULL,
+  store_name       VARCHAR(255) NOT NULL,
+  store_address    VARCHAR(500),
+  store_phone      VARCHAR(20),
+  lat              DECIMAL(10,8) NOT NULL,
+  lng              DECIMAL(11,8) NOT NULL,
+  business_type    VARCHAR(100),
+  store_image_url  VARCHAR(500),
+  status           ENUM('PENDING','APPROVED','REJECTED') DEFAULT 'PENDING',
+  rejection_reason TEXT,
+  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user   (user_id),
+  INDEX idx_status (status)
 );
 
 -- ============================================

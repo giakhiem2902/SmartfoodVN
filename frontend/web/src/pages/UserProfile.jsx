@@ -207,7 +207,15 @@ const UserProfile = () => {
           </Upload>
         </div>
         <h2>{user?.username}</h2>
-        <Tag color="blue">{user?.role === 'admin' ? 'Quản trị viên' : 'Khách hàng'}</Tag>
+        <Tag color={user?.role === 'admin' ? 'red' : user?.role === 'store' ? 'gold' : user?.role === 'driver' ? 'green' : 'blue'}>
+          {user?.role === 'admin'
+            ? 'Quản trị viên'
+            : user?.role === 'store'
+              ? 'Chủ cửa hàng'
+              : user?.role === 'driver'
+                ? 'Tài xế'
+                : 'Khách hàng'}
+        </Tag>
       </Card>
 
       {/* Statistics Section */}

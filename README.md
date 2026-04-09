@@ -114,12 +114,19 @@ WHERE ST_Distance_Sphere(POINT(lng, lat), POINT(?, ?)) / 1000 <= 20;
 ### 1. Database Setup
 
 ```bash
-# Connect to MySQL
-mysql -u root -p
+# Connect to MySQL (Laragon default)
+mysql -u root
 
-# Import schema
-SOURCE database/schema.sql;
+# Import the MySQL 8 compatible schema
+SOURCE database/schema_full.sql;
+
+# If you already created the DB before, also run the update script
+SOURCE database/migration_oauth_2fa.sql;
 ```
+
+> For existing databases, also run:
+> - `node backend/migrations/add-is-hot-to-foods.js`
+> - `node backend/migrations/add-picking-up-status.js`
 
 ### 2. Backend Setup
 

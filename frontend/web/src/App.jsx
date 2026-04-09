@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Input, Dropdown, Card, Tag, Spin, Row, Col, Empty, Divider } from 'antd';
-import { LogoutOutlined, UserOutlined, ShoppingCartOutlined, UserSwitchOutlined, SafetyOutlined, TruckOutlined } from '@ant-design/icons';
+import { Layout, Button, Avatar, message, Space, Tooltip, Badge, Modal, Dropdown, Card, Tag, Spin, Row, Col, Empty, Divider } from 'antd';
+import { LogoutOutlined, UserOutlined, ShoppingCartOutlined, UserSwitchOutlined, SafetyOutlined, TruckOutlined, ShopOutlined } from '@ant-design/icons';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuthStore, useLocationStore, useOrderStore } from './store/useStore';
 import apiClient from './services/apiClient';
@@ -17,12 +17,15 @@ import AdminDashboard from './pages/AdminDashboard';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
 import UserProfile from './pages/UserProfile';
+import StoreRegistrationPage from './pages/StoreRegistrationPage';
+import StoreDashboard from './pages/StoreDashboard';
 import Cart from './components/Cart';
 import './styles/App.css';
 
 const { Header, Content } = Layout;
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+const GOOGLE_OAUTH_ENABLED = Boolean(GOOGLE_CLIENT_ID);
 
 // Layout chính sau khi đăng nhập
 function MainLayout() {
@@ -38,16 +41,12 @@ function MainLayout() {
   // Reverse geocode: convert lat/lng to address using Nominatim
   const getAddressFromCoords = useCallback(async (lat, lng) => {
     try {
-      console.log('getAddressFromCoords called with lat:', lat, 'lng:', lng);
-      
       // Hardcode for testing - Thủ Đức, TP.HCM area
       if (lat >= 10.8 && lat <= 10.9 && lng >= 106.7 && lng <= 106.8) {
-        console.log('Matched hardcode range - setting address to Thủ Đức, TP.HCM');
         setUserAddress('Thủ Đức, TP.HCM');
         return;
       }
       
-      console.log('Outside hardcode range, trying Nominatim...');
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=vi`,
         { 
@@ -60,7 +59,6 @@ function MainLayout() {
       if (!response.ok) throw new Error('Nominatim error');
       
       const data = await response.json();
-      console.log('Nominatim response:', data);
       
       // Extract meaningful address parts
       const address = data.address || {};
@@ -83,8 +81,6 @@ function MainLayout() {
       
       const addressStr = addressParts.filter(Boolean).join(', ');
       const finalAddress = addressStr || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      
-      console.log('Final address:', finalAddress);
       setUserAddress(finalAddress);
     } catch (err) {
       console.error('Geocoding error:', err);
@@ -96,7 +92,6 @@ function MainLayout() {
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
         ({ coords }) => {
-          console.log('Geolocation updated:', coords.latitude, coords.longitude);
           setUserLocation({ lat: coords.latitude, lng: coords.longitude });
           getAddressFromCoords(coords.latitude, coords.longitude);
         },
@@ -220,6 +215,22 @@ function MainLayout() {
                   icon: <ShoppingCartOutlined />,
                   onClick: () => navigate('/orders'),
                 },
+                ...(user?.role === 'user'
+                  ? [{
+                      key: 'become-store',
+                      label: 'Đăng ký bán hàng',
+                      icon: <ShopOutlined />,
+                      onClick: () => navigate('/become-store'),
+                    }]
+                  : []),
+                ...(user?.role === 'store'
+                  ? [{
+                      key: 'store-dashboard',
+                      label: 'Quản lý cửa hàng',
+                      icon: <ShopOutlined />,
+                      onClick: () => navigate('/store-dashboard'),
+                    }]
+                  : []),
                 {
                   key: 'tracking',
                   label: 'Theo dõi đơn hàng',
@@ -266,6 +277,14 @@ function MainLayout() {
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/security" element={<SecuritySettingsPage />} />
             <Route
+              path="/become-store"
+              element={user?.role === 'user' ? <StoreRegistrationPage /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/store-dashboard"
+              element={user?.role === 'store' ? <StoreDashboard /> : <Navigate to="/" />}
+            />
+            <Route
               path="/admin"
               element={user?.role === 'admin' ? <AdminDashboard token={token} /> : <Navigate to="/" />}
             />
@@ -284,7 +303,7 @@ function MainLayout() {
         onCancel={() => setTrackingModalOpen(false)}
         width={900}
         footer={null}
-        bodyStyle={{ maxHeight: '600px', overflowY: 'auto' }}
+        styles={{ body: { maxHeight: '600px', overflowY: 'auto' } }}
       >
         <Spin spinning={loadingOrders}>
           {trackingOrders.length > 0 ? (
@@ -298,13 +317,14 @@ function MainLayout() {
               <Row gutter={[16, 16]}>
                 {trackingOrders.map((order) => {
                   const statusColors = {
-                    PENDING: { color: 'orange', text: '⏳ Chờ xác nhận' },
-                    CONFIRMED: { color: 'blue', text: '✅ Đã xác nhận' },
-                    FINDING_DRIVER: { color: 'cyan', text: '🔍 Tìm tài xế' },
-                    DRIVER_ACCEPTED: { color: 'green', text: '🤝 Tài xế nhận' },
-                    DELIVERING: { color: 'blue', text: '🚚 Đang giao' },
-                    COMPLETED: { color: 'green', text: '✨ Hoàn thành' },
-                    CANCELLED: { color: 'red', text: '❌ Hủy' },
+                    PENDING: { color: 'orange', text: '⏳ Đợi cửa hàng xác nhận' },
+                    CONFIRMED: { color: 'blue', text: '👨‍🍳 Quán đang làm món cho bạn' },
+                    FINDING_DRIVER: { color: 'cyan', text: '🔎 Quán đang tìm tài xế' },
+                    DRIVER_ACCEPTED: { color: 'green', text: '🤝 Tài xế đã nhận đơn' },
+                    PICKING_UP: { color: 'purple', text: '🏪 Tài xế đang lấy hàng' },
+                    DELIVERING: { color: 'blue', text: '🚚 Tài xế đang giao cho bạn' },
+                    COMPLETED: { color: 'green', text: '✅ Đơn hàng đã hoàn thành' },
+                    CANCELLED: { color: 'red', text: '❌ Đã hủy' },
                   };
 
                   return (
@@ -401,22 +421,68 @@ function MainLayout() {
 }
 
 function App() {
-  const { token, requires2FA } = useAuthStore();
+  const { token, user, setUser, logout } = useAuthStore();
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let isMounted = true;
+
+    const syncCurrentUser = async () => {
+      try {
+        const currentUser = await apiClient.getCurrentUser();
+        if (!isMounted) return;
+
+        const hasChanged = !user
+          || currentUser.id !== user.id
+          || currentUser.role !== user.role
+          || currentUser.username !== user.username
+          || currentUser.phone !== user.phone
+          || currentUser.image_url !== user.image_url;
+
+        if (hasChanged) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        if (isMounted) {
+          logout();
+        }
+      }
+    };
+
+    syncCurrentUser();
+    const intervalId = window.setInterval(syncCurrentUser, 10000);
+    window.addEventListener('focus', syncCurrentUser);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncCurrentUser);
+    };
+  }, [token, user?.id, user?.role, user?.username, user?.phone, user?.image_url, setUser, logout]);
+
+  const appContent = (
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes>
+        {/* OTP verification — truy cập được khi chưa có token đầy đủ */}
+        <Route path="/verify-otp" element={<OTPVerificationPage />} />
+
+        {/* Chưa đăng nhập → LoginPage */}
+        <Route
+          path="*"
+          element={token ? <MainLayout /> : <LoginPage />}
+        />
+      </Routes>
+    </Router>
+  );
+
+  if (!GOOGLE_OAUTH_ENABLED) {
+    return appContent;
+  }
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <Router>
-        <Routes>
-          {/* OTP verification — truy cập được khi chưa có token đầy đủ */}
-          <Route path="/verify-otp" element={<OTPVerificationPage />} />
-
-          {/* Chưa đăng nhập → LoginPage */}
-          <Route
-            path="*"
-            element={token ? <MainLayout /> : <LoginPage />}
-          />
-        </Routes>
-      </Router>
+      {appContent}
     </GoogleOAuthProvider>
   );
 }

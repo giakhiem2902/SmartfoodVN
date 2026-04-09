@@ -1,4 +1,4 @@
-const { Order, OrderItem, Food } = require('../models');
+const { Order, OrderItem, Food, Store } = require('../models');
 const { Op } = require('sequelize');
 const { createOrder, getOrderDetails, updateOrderStatus, assignDriverToOrder } = require('../services/orderService');
 const { findAvailableDrivers } = require('../services/locationService');
@@ -55,8 +55,11 @@ const getOrder = async (req, res, next) => {
       return sendError(res, 'Order not found', 404);
     }
 
+    const store = await Store.findByPk(order.store_id);
+    const isStoreOwner = store && Number(store.owner_id) === Number(req.user.id);
+
     // Check authorization
-    if (req.user.role !== 'admin' && order.user_id !== req.user.id && order.driver_id !== req.user.id) {
+    if (req.user.role !== 'admin' && order.user_id !== req.user.id && order.driver_id !== req.user.id && !isStoreOwner) {
       return sendError(res, 'Unauthorized to view this order', 403);
     }
 
@@ -104,12 +107,30 @@ const getUserOrders = async (req, res, next) => {
 const getStoreOrders = async (req, res, next) => {
   try {
     const { storeId } = req.params;
+
+    const store = await Store.findByPk(storeId);
+    if (!store) {
+      return sendError(res, 'Store not found', 404);
+    }
+
+    if (req.user.role !== 'admin' && Number(store.owner_id) !== Number(req.user.id)) {
+      return sendError(res, 'Unauthorized to view this store orders', 403);
+    }
+
     const orders = await Order.findAll({
       where: { store_id: storeId },
       include: [
         {
+          association: 'user',
+          attributes: ['id', 'username', 'phone', 'email'],
+        },
+        {
+          association: 'driver',
+          attributes: ['id', 'username', 'phone', 'is_online'],
+        },
+        {
           association: 'items',
-          include: [{ model: Food }],
+          include: [{ model: Food, attributes: ['id', 'name', 'price', 'image_url'] }],
         },
       ],
       order: [['created_at', 'DESC']],
@@ -131,8 +152,56 @@ const updateStatus = async (req, res, next) => {
       return sendError(res, 'Status is required', 400);
     }
 
-    const order = await updateOrderStatus(orderId, status);
-    sendSuccess(res, order, 'Order status updated');
+    const order = await Order.findByPk(orderId);
+    if (!order) {
+      return sendError(res, 'Order not found', 404);
+    }
+
+    const store = await Store.findByPk(order.store_id);
+    const isStoreOwner = store && Number(store.owner_id) === Number(req.user.id);
+    const isDriverOwner = Number(order.driver_id) === Number(req.user.id);
+    const isCustomer = Number(order.user_id) === Number(req.user.id);
+
+    const roleAllowedStatuses = {
+      admin: ['PENDING', 'CONFIRMED', 'FINDING_DRIVER', 'DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING', 'COMPLETED', 'CANCELLED'],
+      store: ['CONFIRMED', 'FINDING_DRIVER', 'PICKING_UP', 'DELIVERING', 'CANCELLED'],
+      driver: ['PICKING_UP', 'DELIVERING', 'COMPLETED'],
+      user: ['CANCELLED'],
+    };
+
+    const validNextStatuses = {
+      PENDING: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['FINDING_DRIVER', 'CANCELLED'],
+      FINDING_DRIVER: ['DRIVER_ACCEPTED', 'CANCELLED'],
+      DRIVER_ACCEPTED: ['PICKING_UP', 'DELIVERING', 'CANCELLED'],
+      PICKING_UP: ['DELIVERING', 'CANCELLED'],
+      DELIVERING: ['COMPLETED'],
+      COMPLETED: [],
+      CANCELLED: [],
+    };
+
+    if (!roleAllowedStatuses[req.user.role]?.includes(status)) {
+      return sendError(res, 'This role cannot update to the requested status', 403);
+    }
+
+    if (req.user.role === 'store' && !isStoreOwner) {
+      return sendError(res, 'Only the store owner can update this order', 403);
+    }
+
+    if (req.user.role === 'driver' && !isDriverOwner) {
+      return sendError(res, 'Only the assigned driver can update this order', 403);
+    }
+
+    if (req.user.role === 'user' && !isCustomer) {
+      return sendError(res, 'Unauthorized to update this order', 403);
+    }
+
+    if (req.user.role !== 'admin' && !validNextStatuses[order.status]?.includes(status)) {
+      return sendError(res, `Cannot move order from ${order.status} to ${status}`, 400);
+    }
+
+    const updatedOrder = await updateOrderStatus(orderId, status);
+    sendSuccess(res, updatedOrder, 'Order status updated');
   } catch (error) {
     if (error.message.includes('not found')) {
       return sendError(res, error.message, 404);
@@ -148,6 +217,15 @@ const acceptOrder = async (req, res, next) => {
 
     if (req.user.role !== 'driver') {
       return sendError(res, 'Only drivers can accept orders', 403);
+    }
+
+    const existingOrder = await Order.findByPk(orderId);
+    if (!existingOrder) {
+      return sendError(res, 'Order not found', 404);
+    }
+
+    if (existingOrder.status !== 'FINDING_DRIVER') {
+      return sendError(res, 'Order is not ready for driver assignment', 400);
     }
 
     const order = await assignDriverToOrder(orderId, req.user.id);

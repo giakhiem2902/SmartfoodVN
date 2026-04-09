@@ -6,7 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/useStore';
 
-export default function GoogleSignInButton({ buttonText = 'Đăng nhập bằng Google' }) {
+const GOOGLE_OAUTH_ENABLED = Boolean(process.env.REACT_APP_GOOGLE_CLIENT_ID);
+
+function GoogleSignInEnabledButton({ buttonText = 'Đăng nhập bằng Google' }) {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
   const { setUser, setToken, setPending2FA } = useAuthStore();
@@ -61,4 +63,28 @@ export default function GoogleSignInButton({ buttonText = 'Đăng nhập bằng 
       {loading ? 'Đang xử lý...' : buttonText}
     </Button>
   );
+}
+
+export default function GoogleSignInButton({ buttonText = 'Đăng nhập bằng Google' }) {
+  if (!GOOGLE_OAUTH_ENABLED) {
+    return (
+      <Button
+        size="large"
+        icon={<GoogleOutlined />}
+        block
+        disabled
+        style={{
+          borderColor: '#d9d9d9',
+          color: '#999',
+          fontWeight: 600,
+          height: '42px',
+        }}
+        title="Thiếu REACT_APP_GOOGLE_CLIENT_ID trong frontend/web/.env"
+      >
+        {`${buttonText} (chưa cấu hình)`}
+      </Button>
+    );
+  }
+
+  return <GoogleSignInEnabledButton buttonText={buttonText} />;
 }

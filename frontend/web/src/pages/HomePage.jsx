@@ -1,9 +1,9 @@
 import React from 'react';
-import { Button, Row, Col, Card, Typography, Space, Badge } from 'antd';
+import { Button, Row, Col, Card, Typography, Space } from 'antd';
 import {
-  ThunderboltOutlined, EnvironmentOutlined, ClockCircleOutlined,
+  ThunderboltOutlined, ClockCircleOutlined,
   SafetyOutlined, StarFilled, RightOutlined, GiftOutlined,
-  ShoppingOutlined, CarOutlined, CheckCircleFilled,
+  ShoppingOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useStore';
@@ -146,6 +146,19 @@ const HomePage = () => {
                 >
                   Xem quán ăn gần bạn →
                 </Button>
+                {user?.role === 'user' && (
+                  <Button
+                    size="large"
+                    onClick={() => navigate('/become-store')}
+                    style={{
+                      borderRadius: 50, height: 52, padding: '0 28px',
+                      fontSize: 15, borderColor: '#1890ff', color: '#1890ff',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Muốn bán hàng?
+                  </Button>
+                )}
               </Space>
 
               {/* trust badges */}
