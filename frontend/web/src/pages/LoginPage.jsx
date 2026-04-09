@@ -34,6 +34,13 @@ const LoginPage = () => {
       setToken(response.token);
       setUser(response.user);
       message.success('Đăng nhập thành công!');
+
+      // Redirect theo role
+      const role = response.user?.role;
+      if (role === 'store') navigate('/store-dashboard');
+      else if (role === 'admin') navigate('/admin');
+      else if (role === 'driver') navigate('/');
+      // role 'user' không cần navigate — App.jsx sẽ render MainLayout → '/'
     } catch (error) {
       message.error(error.response?.data?.message || 'Đăng nhập thất bại');
     } finally {
@@ -54,6 +61,7 @@ const LoginPage = () => {
       setToken(response.token);
       setUser(response.user);
       message.success('Đăng ký thành công!');
+      navigate('/');
     } catch (error) {
       message.error(error.response?.data?.message || 'Đăng ký thất bại');
     } finally {

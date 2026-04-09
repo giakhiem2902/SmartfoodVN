@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Alert, ScrollView, StatusBar,
+  Alert, ScrollView, StatusBar, Platform, PermissionsAndroid,
 } from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuthStore, useDriverStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
@@ -12,8 +13,17 @@ const PRIMARY = '#ff6b35';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuthStore();
-  const { isOnline, setIsOnline, currentLocation } = useDriverStore();
+  const { isOnline, setIsOnline, currentLocation, setCurrentLocation } = useDriverStore();
   const [toggling, setToggling] = useState(false);
+  const [stats, setStats] = useState({ orders: 0, completed: 0, earnings: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [locationName, setLocationName] = useState('Đang xác định địa chỉ...');
+  
+  const watchIdRef = useRef(null);
+
+  // Log render với locationName hiện tại
+  // (Logs sau debug - có thể remove sau khi fix)
+  // console.log('[ProfileScreen render] locationName:', locationName);
 
 
   const handleToggleStatus = async () => {
@@ -39,6 +49,92 @@ const ProfileScreen = ({ navigation }) => {
       setToggling(false);
     }
   };
+
+  const startLocationWatch = useCallback(async () => {
+    const startWatch = () => {
+      watchIdRef.current = Geolocation.watchPosition(
+        ({ coords }) => {
+          const loc = { latitude: coords.latitude, longitude: coords.longitude };
+          setCurrentLocation(loc);
+        },
+        (err) => {
+          console.warn('[ProfileScreen GPS error]', err.code, err.message);
+        },
+        { enableHighAccuracy: true, distanceFilter: 50, interval: 10000 }
+      );
+    };
+
+    if (Platform.OS === 'ios') {
+      Geolocation.requestAuthorization('whenInUse').then(startWatch);
+    } else {
+      // Android: xin quyền runtime
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'SmartFood Driver cần quyền GPS',
+            message: 'Ứng dụng cần truy cập vị trí để hiển thị địa chỉ của bạn.',
+            buttonPositive: 'Cho phép',
+            buttonNegative: 'Từ chối',
+          }
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          startWatch();
+        }
+      } catch (err) {
+        console.warn('Permission error in ProfileScreen', err);
+      }
+    }
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      setLoadingStats(true);
+      const { token } = useAuthStore.getState();
+      if (!token) {
+        console.warn('No token available');
+        return;
+      }
+      // Lấy thống kê hôm nay
+      const response = await apiClient.getDriverStats(token);
+      console.log('[loadStats] Response:', response);
+      
+      // API trả về { success, message, data: {...} }
+      const data = response.data || response;
+      if (data) {
+        setStats({
+          orders: parseInt(data.totalOrders) || 0,
+          completed: parseInt(data.completedOrders) || 0,
+          earnings: parseFloat(data.earnings) || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+    startLocationWatch();
+
+    return () => {
+      // Cleanup: Dừng watch khi rời khỏi screen
+      if (watchIdRef.current != null) {
+        Geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, [startLocationWatch]);
+
+  useEffect(() => {
+    if (currentLocation?.latitude && currentLocation?.longitude) {
+      // Display GPS in simple format (latitude, longitude in degrees)
+      // Format: 10.85°, 106.77° (2 decimal places for readability)
+      const displayName = `${currentLocation.latitude.toFixed(2)}°, ${currentLocation.longitude.toFixed(2)}°`;
+      setLocationName(displayName);
+    }
+  }, [currentLocation]);
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất không?', [
@@ -105,9 +201,7 @@ const ProfileScreen = ({ navigation }) => {
         <InfoRow
           icon="map-marker-outline"
           label="Vị trí GPS"
-          value={currentLocation
-            ? `${currentLocation.latitude.toFixed(5)}, ${currentLocation.longitude.toFixed(5)}`
-            : 'Đang lấy GPS...'}
+          value={locationName}
         />
       </View>
 
@@ -115,9 +209,24 @@ const ProfileScreen = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Hôm nay</Text>
         <View style={styles.statsRow}>
-          <StatCard icon="package-variant" label="Đơn nhận" value="—" color="#1890ff" />
-          <StatCard icon="check-circle-outline" label="Hoàn thành" value="—" color="#52c41a" />
-          <StatCard icon="cash" label="Thu nhập" value="—" color={PRIMARY} />
+          <StatCard
+            icon="package-variant"
+            label="Đơn nhận"
+            value={loadingStats ? '...' : stats.orders.toString()}
+            color="#1890ff"
+          />
+          <StatCard
+            icon="check-circle-outline"
+            label="Hoàn thành"
+            value={loadingStats ? '...' : stats.completed.toString()}
+            color="#52c41a"
+          />
+          <StatCard
+            icon="cash"
+            label="Thu nhập"
+            value={loadingStats ? '...' : `${(stats.earnings || 0).toLocaleString('vi-VN')}đ`}
+            color={PRIMARY}
+          />
         </View>
       </View>
 

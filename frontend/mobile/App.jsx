@@ -41,17 +41,17 @@ const DriverTabs = () => {
       <Tab.Screen
         name="AvailableOrders"
         component={AvailableOrdersScreen}
-        options={{ title: 'Available Orders' }}
+        options={{ title: 'Đơn hàng sẵn có' }}
       />
       <Tab.Screen
         name="ActiveDeliveries"
         component={ActiveDeliveriesScreen}
-        options={{ title: 'My Deliveries' }}
+        options={{ title: 'Đang giao hàng' }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: 'Profile' }}
+        options={{ title: 'Hồ sơ' }}
       />
     </Tab.Navigator>
   );

@@ -15,6 +15,7 @@ router.get('/store/:storeId/orders', auth, authorize('store', 'admin'), orderCon
 // Driver operations
 router.get('/available', auth, authorize('driver'), orderController.getAvailableOrders);
 router.get('/driver/active', auth, authorize('driver'), orderController.getDriverOrders);
+router.get('/driver/stats', auth, authorize('driver'), orderController.getDriverStats);
 router.post('/:orderId/accept', auth, authorize('driver'), orderController.acceptOrder);
 
 // Update order status
