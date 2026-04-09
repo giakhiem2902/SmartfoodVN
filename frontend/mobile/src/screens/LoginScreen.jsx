@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useAuthStore } from '../store/useStore';
 import apiClient from '../services/apiClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -25,7 +27,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ email và mật khẩu');
       return;
     }
 
@@ -38,10 +40,10 @@ const LoginScreen = ({ navigation }) => {
         await setUser(response.data.user);
         navigation.replace('Main');
       } else {
-        Alert.alert('Error', 'Invalid credentials or not a driver account');
+        Alert.alert('Đăng nhập thất bại', 'Sai thông tin hoặc tài khoản không phải tài xế');
       }
     } catch (error) {
-      Alert.alert('Error', 'Login failed');
+      Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại');
       console.error('Login error:', error);
     } finally {
       setLoading(false);
@@ -50,7 +52,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!username || !email || !password || !phone) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ tất cả các trường');
       return;
     }
 
@@ -69,10 +71,10 @@ const LoginScreen = ({ navigation }) => {
         await setUser(response.data.user);
         navigation.replace('Main');
       } else {
-        Alert.alert('Error', response.message);
+        Alert.alert('Đăng ký thất bại', response.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'Registration failed');
+      Alert.alert('Lỗi', 'Đăng ký thất bại, vui lòng thử lại');
       console.error('Register error:', error);
     } finally {
       setLoading(false);
@@ -80,144 +82,200 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerText}>🚗 SmartFood Driver</Text>
-        <Text style={styles.subHeaderText}>Delivery App</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#ff6b35" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
 
-      <View style={styles.formContainer}>
-        {isRegister && (
-          <>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter username"
-              value={username}
-              onChangeText={setUsername}
-              placeholderTextColor="#999"
-            />
+        {/* ── HEADER ── */}
+        <View style={styles.header}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoIcon}>🛵</Text>
+          </View>
+          <Text style={styles.appName}>SmartFood Driver</Text>
+          <Text style={styles.appSlogan}>Giao hàng nhanh – Kiếm tiền dễ</Text>
+        </View>
 
-            <Text style={styles.label}>Phone</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0123456789"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholderTextColor="#999"
-            />
-          </>
-        )}
+        {/* ── TAB ── */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tab, !isRegister && styles.tabActive]}
+            onPress={() => setIsRegister(false)}
+          >
+            <Text style={[styles.tabText, !isRegister && styles.tabTextActive]}>Đăng nhập</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, isRegister && styles.tabActive]}
+            onPress={() => setIsRegister(true)}
+          >
+            <Text style={[styles.tabText, isRegister && styles.tabTextActive]}>Đăng ký</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor="#999"
-        />
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor="#999"
-        />
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={isRegister ? handleRegister : handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isRegister ? 'Register' : 'Login'}
-            </Text>
+        {/* ── FORM ── */}
+        <View style={styles.formCard}>
+          {isRegister && (
+            <>
+              <Text style={styles.label}>👤 Tên tài xế</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập tên của bạn"
+                value={username}
+                onChangeText={setUsername}
+                placeholderTextColor="#bbb"
+              />
+              <Text style={styles.label}>📞 Số điện thoại</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0123 456 789"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor="#bbb"
+              />
+            </>
           )}
-        </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
-          <Text style={styles.toggleText}>
-            {isRegister
-              ? 'Already have an account? Login'
-              : "Don't have an account? Register"}
+          <Text style={styles.label}>✉️ Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="driver@email.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholderTextColor="#bbb"
+          />
+
+          <Text style={styles.label}>🔒 Mật khẩu</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholderTextColor="#bbb"
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={isRegister ? handleRegister : handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isRegister ? '🚀 Tạo tài khoản' : '🛵 Đăng nhập'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* ── FOOTER ── */}
+        <Text style={styles.footerText}>
+          {isRegister ? 'Đã có tài khoản? ' : 'Chưa có tài khoản? '}
+          <Text style={styles.footerLink} onPress={() => setIsRegister(!isRegister)}>
+            {isRegister ? 'Đăng nhập ngay' : 'Đăng ký ngay'}
           </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </Text>
+
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
+const PRIMARY = '#ff6b35';
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  contentContainer: {
-    justifyContent: 'center',
-    paddingBottom: 20,
-  },
-  headerContainer: {
+  container: { flex: 1, backgroundColor: '#fff5f0' },
+  contentContainer: { paddingBottom: 40 },
+
+  // Header
+  header: {
+    backgroundColor: PRIMARY,
     alignItems: 'center',
-    marginVertical: 40,
+    paddingTop: 60,
+    paddingBottom: 36,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  headerText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  subHeaderText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+  logoIcon: { fontSize: 40 },
+  appName: { fontSize: 26, fontWeight: 'bold', color: '#fff', letterSpacing: 0.5 },
+  appSlogan: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
+
+  // Tab
+  tabRow: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    marginTop: 24,
+    backgroundColor: '#ffe5d9',
+    borderRadius: 12,
+    padding: 4,
   },
-  formContainer: {
-    paddingHorizontal: 20,
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 15,
+  tabActive: { backgroundColor: PRIMARY },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#ff6b35' },
+  tabTextActive: { color: '#fff' },
+
+  // Form
+  formCard: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    elevation: 3,
+    shadowColor: '#ff6b35',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
+  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 14 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    borderWidth: 1.5,
+    borderColor: '#ffe0cc',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    backgroundColor: '#fff',
+    backgroundColor: '#fffaf8',
     color: '#333',
   },
   button: {
-    backgroundColor: '#0066cc',
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: PRIMARY,
+    paddingVertical: 15,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 25,
+    marginTop: 24,
+    elevation: 3,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  toggleText: {
-    textAlign: 'center',
-    marginTop: 15,
-    color: '#0066cc',
-    fontWeight: '600',
-  },
+  buttonDisabled: { opacity: 0.7 },
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+
+  // Footer
+  footerText: { textAlign: 'center', marginTop: 20, fontSize: 13, color: '#888' },
+  footerLink: { color: PRIMARY, fontWeight: 'bold' },
 });
 
 export default LoginScreen;

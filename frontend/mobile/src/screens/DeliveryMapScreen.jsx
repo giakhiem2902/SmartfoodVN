@@ -1,9 +1,9 @@
 /**
  * DeliveryMapScreen
  * ─────────────────
- * • OpenStreetMap tiles (react-native-maps URLTile – no Google Maps API key needed)
- * • OSRM routing: driver ──► store ──► customer
- * • Real-time driver location broadcast via socket
+ * • OSM tiles qua Leaflet.js (WebView) – không cần Google Maps API key
+ * • OSRM routing: driver ──► store ──► customer  (polyline thực sự trên đường)
+ * • Real-time driver marker update qua injectJavaScript (không reload map)
  * • Status flow: DRIVER_ACCEPTED → PICKING_UP → DELIVERING → COMPLETED
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,45 +17,48 @@ import {
   ScrollView,
   Platform,
   PermissionsAndroid,
+  StatusBar,
 } from 'react-native';
-import MapView, { Marker, Polyline, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import Geolocation from 'react-native-geolocation-service';
 import { useAuthStore, useDriverStore } from '../store/useStore';
 import socketService from '../services/socketService';
 import apiClient, { fetchOSRMRoute } from '../services/apiClient';
 import OsmMap from '../components/OsmMap';
 
+const PRIMARY = '#ff6b35';
+const PRIMARY_LIGHT = '#fff3ee';
+
 // ─── Status configuration ─────────────────────────────────────────────────────
 const STATUS_FLOW = [
   {
     key: 'DRIVER_ACCEPTED',
     label: 'Đã nhận đơn',
-    icon: '✅',
-    color: '#0066cc',
+    icon: '✓',
+    color: PRIMARY,
     next: 'PICKING_UP',
-    nextLabel: '📍 Bắt đầu lấy hàng',
+    nextLabel: 'Bắt đầu lấy hàng',
   },
   {
     key: 'PICKING_UP',
     label: 'Đang lấy hàng',
     icon: '🏪',
-    color: '#ff9500',
+    color: '#f39c12',
     next: 'DELIVERING',
-    nextLabel: '🛵 Bắt đầu giao hàng',
+    nextLabel: 'Bắt đầu giao hàng',
   },
   {
     key: 'DELIVERING',
     label: 'Đang giao hàng',
     icon: '🛵',
-    color: '#9b59b6',
+    color: '#8e44ad',
     next: 'COMPLETED',
-    nextLabel: '✅ Hoàn thành giao hàng',
+    nextLabel: 'Hoàn thành giao hàng',
   },
   {
     key: 'COMPLETED',
     label: 'Đã hoàn thành',
     icon: '🎉',
-    color: '#00cc66',
+    color: '#27ae60',
     next: null,
     nextLabel: null,
   },
@@ -75,7 +78,7 @@ const DeliveryMapScreen = ({ route, navigation }) => {
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const mapRef = useRef(null);
+  const mapWebViewRef = useRef(null); // ref tới WebView bên trong OsmMap
   const watchIdRef = useRef(null);
 
   // ─── Fetch order ────────────────────────────────────────────────────────────
@@ -116,17 +119,30 @@ const DeliveryMapScreen = ({ route, navigation }) => {
 
   // ─── Start GPS tracking ──────────────────────────────────────────────────────
   const startTracking = useCallback(() => {
+    // Lấy vị trí ngay lập tức (không đợi distanceFilter)
+    Geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const loc = { latitude: coords.latitude, longitude: coords.longitude };
+        setDriverLocation(loc);
+        socketService.updateDriverLocation(orderId, coords.latitude, coords.longitude, user?.id);
+      },
+      (err) => console.warn('getCurrentPosition error', err.code, err.message),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+
+    // Tiếp tục watch để cập nhật real-time
     watchIdRef.current = Geolocation.watchPosition(
       ({ coords }) => {
         const loc = { latitude: coords.latitude, longitude: coords.longitude };
         setDriverLocation(loc);
         socketService.updateDriverLocation(orderId, coords.latitude, coords.longitude, user?.id);
-        mapRef.current?.animateToRegion(
-          { ...loc, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-          500
-        );
+        // Inject JS vào WebView để update marker driver không cần reload
+        if (mapWebViewRef.current) {
+          const msg = JSON.stringify({ type: 'UPDATE_DRIVER', lat: coords.latitude, lng: coords.longitude, color: '#2196F3' });
+          mapWebViewRef.current.injectJavaScript(`handleMessage(${JSON.stringify(msg)});true;`);
+        }
       },
-      (err) => console.warn('GPS error', err.code, err.message),
+      (err) => console.warn('GPS watch error', err.code, err.message),
       { enableHighAccuracy: true, distanceFilter: 10, interval: 4000, fastestInterval: 2000 }
     );
   }, [orderId, user?.id]);
@@ -149,27 +165,31 @@ const DeliveryMapScreen = ({ route, navigation }) => {
       }
     });
 
-    if (Platform.OS === 'ios') {
-      Geolocation.requestAuthorization('whenInUse').then(() => startTracking());
-    } else {
-      PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'SmartFood Driver cần quyền GPS',
-          message: 'Ứng dụng cần vị trí để theo dõi lộ trình giao hàng.',
-          buttonPositive: 'Cho phép',
-          buttonNegative: 'Từ chối',
-        }
-      ).then((granted) => {
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          startTracking();
-        } else {
-          Alert.alert('Cần quyền GPS', 'Vui lòng cấp quyền vị trí để giao hàng.');
-        }
-      });
-    }
+    // Delay nhỏ để Activity attach xong trước khi gọi PermissionsAndroid
+    const timer = setTimeout(() => {
+      if (Platform.OS === 'ios') {
+        Geolocation.requestAuthorization('whenInUse').then(() => startTracking());
+      } else {
+        PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'SmartFood Driver cần quyền GPS',
+            message: 'Ứng dụng cần vị trí để theo dõi lộ trình giao hàng.',
+            buttonPositive: 'Cho phép',
+            buttonNegative: 'Từ chối',
+          }
+        ).then((granted) => {
+          if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+            startTracking();
+          } else {
+            Alert.alert('Cần quyền GPS', 'Vui lòng cấp quyền vị trí để giao hàng.');
+          }
+        });
+      }
+    }, 300);
 
     return () => {
+      clearTimeout(timer);
       if (watchIdRef.current != null) Geolocation.clearWatch(watchIdRef.current);
       socketService.leaveOrder(orderId);
       socketService.off('ORDER_STATUS_CHANGED');
@@ -181,14 +201,21 @@ const DeliveryMapScreen = ({ route, navigation }) => {
     if (driverLocation && order) buildRoute(driverLocation, order);
   }, [order]);
 
+  // Trigger buildRoute lần đầu khi GPS lock (driverLocation từ null → có giá trị)
+  const routeBuiltRef = useRef(false);
+  useEffect(() => {
+    if (driverLocation && order && !routeBuiltRef.current) {
+      routeBuiltRef.current = true;
+      buildRoute(driverLocation, order);
+    }
+  }, [driverLocation, order]);
+
   // ─── Fit map to all waypoints ────────────────────────────────────────────────
   const fitToRoute = () => {
-    const all = [...routeSegments.toStore, ...routeSegments.toUser];
-    if (!mapRef.current || all.length === 0) return;
-    mapRef.current.fitToCoordinates(all, {
-      edgePadding: { top: 60, right: 40, bottom: 220, left: 40 },
-      animated: true,
-    });
+    if (!mapWebViewRef.current) return;
+    mapWebViewRef.current.injectJavaScript(
+      `handleMessage(${JSON.stringify(JSON.stringify({ type: 'FIT_BOUNDS' }))});true;`
+    );
   };
 
   // ─── Advance status ─────────────────────────────────────────────────────────
@@ -256,21 +283,35 @@ const DeliveryMapScreen = ({ route, navigation }) => {
     ? { ...storeLoc, latitudeDelta: 0.04, longitudeDelta: 0.04 }
     : { latitude: 10.8231, longitude: 106.6297, latitudeDelta: 0.04, longitudeDelta: 0.04 };
 
+  // Chuyển routeSegments thành prop 'route' cho OsmMap
+  // Đoạn xanh dương: driver → store | Đoạn cam: store → khách hàng
+  const routeProp = [
+    ...(routeSegments.toStore.length > 1
+      ? [{ coords: routeSegments.toStore, color: '#1565C0', weight: 5 }]
+      : []),
+    ...(routeSegments.toUser.length > 1
+      ? [{ coords: routeSegments.toUser, color: '#E65100', weight: 5 }]
+      : []),
+  ];
+
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor={PRIMARY} barStyle="light-content" />
       {/* ══════════════ MAP ══════════════ */}
       <OsmMap
         style={styles.map}
         region={initialRegion}
+        webViewRef={mapWebViewRef}
+        route={routeProp}
         onReady={fitToRoute}
         markers={[
           ...(driverLocation
-            ? [{ id: 'driver', coordinate: driverLocation, title: 'Tôi 🛵', color: '#2196F3' }]
+            ? [{ id: 'driver', coordinate: driverLocation, title: 'Tài xế', type: 'driver', color: '#2196F3' }]
             : []),
           ...(storeLoc
-            ? [{ id: 'store', coordinate: storeLoc, title: `🏪 ${order.store?.name ?? 'Cửa hàng'}`, color: '#FF6F00' }]
+            ? [{ id: 'store', coordinate: storeLoc, title: order.store?.name ?? 'Cửa hàng', type: 'store', color: '#FF6F00' }]
             : []),
-          { id: 'dest', coordinate: destLoc, title: '� Khách hàng', color: '#E53935' },
+          { id: 'dest', coordinate: destLoc, title: 'Khách hàng', type: 'destination', color: '#E53935' },
         ]}
       />
 
@@ -282,7 +323,7 @@ const DeliveryMapScreen = ({ route, navigation }) => {
       {/* Route loading overlay */}
       {loadingRoute && (
         <View style={styles.routeLoader}>
-          <ActivityIndicator size="small" color="#0066cc" />
+          <ActivityIndicator size="small" color={PRIMARY} />
           <Text style={styles.routeLoaderText}>Đang tải đường đi…</Text>
         </View>
       )}
@@ -303,13 +344,15 @@ const DeliveryMapScreen = ({ route, navigation }) => {
                     active && { backgroundColor: s.color, borderColor: s.color },
                   ]}
                 >
-                  <Text style={{ fontSize: 10 }}>{passed ? '✓' : s.icon}</Text>
+                  <Text style={{ fontSize: 11, color: (passed || active) ? '#fff' : '#bbb', fontWeight: 'bold' }}>
+                    {passed ? '✓' : s.icon}
+                  </Text>
                 </View>
                 <Text
                   style={[
                     styles.timelineLabel,
-                    active && { color: s.color, fontWeight: 'bold' },
-                    passed && { color: '#00cc66' },
+                    active && { color: s.color, fontWeight: '700' },
+                    passed && { color: '#27ae60' },
                   ]}
                   numberOfLines={2}
                 >
@@ -372,8 +415,8 @@ const DeliveryMapScreen = ({ route, navigation }) => {
             )}
           </TouchableOpacity>
         ) : (
-          <View style={[styles.actionBtn, { backgroundColor: '#00cc66' }]}>
-            <Text style={styles.actionBtnText}>🎉 Đơn hàng đã hoàn thành</Text>
+          <View style={[styles.actionBtn, { backgroundColor: '#27ae60' }]}>
+            <Text style={styles.actionBtnText}>🎉 Đã giao hàng thành công!</Text>
           </View>
         )}
       </ScrollView>
@@ -386,37 +429,13 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   map: { flex: 1, minHeight: 300 },
 
-  driverMarker: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 4,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-  },
-  storeMarker: {
-    backgroundColor: '#fff8e1',
-    borderRadius: 16,
-    padding: 4,
-    borderWidth: 2,
-    borderColor: '#ff9500',
-  },
-  destMarker: {
-    backgroundColor: '#e8f5e9',
-    borderRadius: 16,
-    padding: 4,
-    borderWidth: 2,
-    borderColor: '#00cc66',
-  },
-
   fitButton: {
     position: 'absolute',
     top: 12,
     right: 12,
     backgroundColor: '#fff',
-    padding: 8,
-    borderRadius: 8,
+    padding: 10,
+    borderRadius: 10,
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.2,
@@ -429,13 +448,15 @@ const styles = StyleSheet.create({
     left: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
-  routeLoaderText: { marginLeft: 6, fontSize: 12, color: '#333' },
+  routeLoaderText: { marginLeft: 6, fontSize: 12, color: '#555' },
 
   // Timeline
   timelineRow: {
@@ -443,55 +464,58 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: '#fff',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#f0f0f0',
   },
   timelineStep: { alignItems: 'center', flex: 1 },
   timelineDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#f0f0f0',
     borderWidth: 2,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  timelinePassed: { backgroundColor: '#e8f5e9', borderColor: '#00cc66' },
-  timelineLabel: { fontSize: 9, color: '#999', marginTop: 4, textAlign: 'center' },
-  timelineLine: { flex: 0.3, height: 2, backgroundColor: '#ccc', marginTop: 13 },
-  timelineLinePassed: { backgroundColor: '#00cc66' },
+  timelinePassed: { backgroundColor: '#e8f8ee', borderColor: '#27ae60' },
+  timelineLabel: { fontSize: 9, color: '#bbb', marginTop: 5, textAlign: 'center', lineHeight: 12 },
+  timelineLine: { flex: 0.25, height: 2, backgroundColor: '#eee', marginTop: 14 },
+  timelineLinePassed: { backgroundColor: '#27ae60' },
 
   // Info card
   infoCard: {
     backgroundColor: '#fff',
-    padding: 16,
-    maxHeight: 240,
+    padding: 14,
+    maxHeight: 230,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#f0f0f0',
   },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  infoIcon: { fontSize: 18, marginRight: 8, marginTop: 2 },
-  infoTitle: { fontSize: 14, fontWeight: '600', color: '#222' },
-  infoSub: { fontSize: 12, color: '#666', marginTop: 2 },
+  infoIcon: { fontSize: 17, marginRight: 8, marginTop: 2, width: 24 },
+  infoTitle: { fontSize: 13, fontWeight: '700', color: '#333' },
+  infoSub: { fontSize: 12, color: '#666', marginTop: 2, lineHeight: 17 },
   infoMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fafafa',
+    borderRadius: 10,
+    padding: 10,
     flexWrap: 'wrap',
     gap: 4,
   },
-  metaItem: { fontSize: 12, color: '#444' },
+  metaItem: { fontSize: 12, color: '#444', fontWeight: '500' },
   actionBtn: {
     marginTop: 12,
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 8,
+    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
   actionBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   disabledBtn: { opacity: 0.6 },
