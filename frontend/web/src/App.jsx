@@ -14,6 +14,15 @@ import Checkout from './pages/Checkout';
 import OrderTracking from './pages/OrderTracking';
 import OrderHistory from './pages/OrderHistory';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLayout from './pages/AdminLayout';
+import Dashboard from './pages/Dashboard';
+import Statistics from './pages/Statistics';
+import UserManagement from './pages/UserManagement';
+import FoodManagement from './pages/FoodManagement';
+import OrderManagement from './pages/OrderManagement';
+import StoreManagement from './pages/StoreManagement';
+import CategoryManagement from './pages/CategoryManagement';
+import Settings from './pages/Settings';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
 import UserProfile from './pages/UserProfile';
@@ -284,10 +293,7 @@ function MainLayout() {
               path="/store-dashboard"
               element={user?.role === 'store' ? <StoreDashboard /> : <Navigate to="/" />}
             />
-            <Route
-              path="/admin"
-              element={user?.role === 'admin' ? <AdminDashboard token={token} /> : <Navigate to="/" />}
-            />
+            <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Content>
@@ -466,6 +472,19 @@ function App() {
       <Routes>
         {/* OTP verification — truy cập được khi chưa có token đầy đủ */}
         <Route path="/verify-otp" element={<OTPVerificationPage />} />
+
+        {/* Admin routes */}
+        <Route path="/admin/*" element={<AdminLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="statistics" element={<Statistics />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="foods" element={<FoodManagement />} />
+          <Route path="orders" element={<OrderManagement />} />
+          <Route path="stores" element={<StoreManagement />} />
+          <Route path="categories" element={<CategoryManagement />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
 
         {/* Chưa đăng nhập → LoginPage */}
         <Route

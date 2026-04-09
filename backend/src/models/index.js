@@ -21,14 +21,14 @@ Category.belongsTo(Store, { foreignKey: 'store_id' });
 
 Store.hasMany(Food, { foreignKey: 'store_id', as: 'foods' });
 Category.hasMany(Food, { foreignKey: 'category_id', as: 'foods' });
-Food.belongsTo(Category, { foreignKey: 'category_id' });
-Food.belongsTo(Store, { foreignKey: 'store_id' });
+Food.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
+Food.belongsTo(Store, { foreignKey: 'store_id', as: 'store' });
 
 User.hasMany(Order, { foreignKey: 'user_id', as: 'orders' });
 Order.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 Store.hasMany(Order, { foreignKey: 'store_id', as: 'orders' });
-Order.belongsTo(Store, { foreignKey: 'store_id' });
+Order.belongsTo(Store, { foreignKey: 'store_id', as: 'store' });
 
 User.hasMany(Order, { foreignKey: 'driver_id', as: 'delivered_orders' });
 Order.belongsTo(User, { foreignKey: 'driver_id', as: 'driver' });
@@ -67,4 +67,5 @@ module.exports = {
   DriverLocationHistory,
   Rating,
   StoreRegistration,
+  sequelize: require('../config/database'),
 };

@@ -1,0 +1,315 @@
+/* ============= DASHBOARD PROFESSIONAL DESIGN ============= */
+
+:root {
+  --primary: #667eea;
+  --secondary: #764ba2;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+}
+
+/* ============= DASHBOARD CONTAINER ============= */
+.dashboard-container {
+  background: #f5f7fa;
+  padding: 28px 24px;
+  border-radius: 0;
+  min-height: 100%;
+}
+
+/* ============= STAT CARDS ============= */
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  transform: translateY(-4px);
+  border-color: #d1d5db;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-card .ant-statistic-title {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  letter-spacing: 0px;
+  text-transform: uppercase;
+}
+
+.stat-card .ant-statistic-content {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 8px;
+  color: #1f2937;
+}
+
+.stat-card .ant-statistic-content-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-card .ant-statistic-content-suffix {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* Stat Card Animation */
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-card {
+  animation: cardEnter 0.3s ease-out;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.05s; }
+.stat-card:nth-child(2) { animation-delay: 0.1s; }
+.stat-card:nth-child(3) { animation-delay: 0.15s; }
+.stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+/* ============= CHART CARDS ============= */
+.chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.chart-card:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+  border-color: #d1d5db;
+}
+
+.chart-card .ant-card-head {
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+  padding: 0 0 12px 0;
+}
+
+.chart-card .ant-card-head-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 15px;
+}
+
+/* Chart Elements */
+.chart-card .recharts-surface {
+  font-family: inherit;
+}
+
+.chart-card .recharts-text {
+  font-size: 12px;
+  fill: #6b7280;
+}
+
+.chart-card .recharts-cartesian-axis-tick {
+  fill: #d1d5db;
+  font-weight: 400;
+}
+
+.chart-card .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.chart-card .recharts-default-tooltip {
+  background: #1f2937 !important;
+  border-radius: 6px;
+  border: none !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.chart-card .recharts-default-tooltip-label {
+  color: #ffffff;
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.chart-card .recharts-tooltip-item {
+  color: #e5e7eb;
+  font-size: 12px;
+}
+
+/* ============= TABLE STYLING ============= */
+.dashboard-container .ant-table {
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.dashboard-container .ant-table-thead > tr > th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px !important;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0px;
+}
+
+.dashboard-container .ant-table-tbody > tr {
+  transition: background-color 0.15s ease;
+}
+
+.dashboard-container .ant-table-tbody > tr:hover > td {
+  background-color: #f9fafb;
+}
+
+.dashboard-container .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f3f4f6;
+  padding: 12px !important;
+  color: #374151;
+  font-size: 13px;
+}
+
+/* ============= BUTTON STYLES ============= */
+.dashboard-container .ant-btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
+  position: relative;
+  font-size: 13px;
+}
+
+.dashboard-container .ant-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.4s;
+}
+
+.dashboard-container .ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.dashboard-container .ant-btn-primary:hover::before {
+  left: 100%;
+}
+
+/* ============= TAG STYLES ============= */
+.dashboard-container .ant-tag {
+  border-radius: 12px;
+  border: none;
+  font-weight: 500;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+/* ============= BADGE STYLES ============= */
+.dashboard-container .ant-badge-count {
+  background: var(--danger);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+/* ============= SPIN LOADER ============= */
+.dashboard-container .ant-spin {
+  color: var(--primary);
+}
+
+/* ============= RESPONSIVE DESIGN ============= */
+@media (max-width: 1200px) {
+  .dashboard-container {
+    padding: 20px 16px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-card .ant-statistic-content {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 12px 8px;
+  }
+
+  .stat-card {
+    margin-bottom: 12px;
+  }
+
+  .stat-card .ant-statistic-content {
+    font-size: 20px;
+  }
+
+  .chart-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .dashboard-container .ant-table {
+    font-size: 12px;
+  }
+
+  .dashboard-container .ant-table-thead > tr > th,
+  .dashboard-container .ant-table-tbody > tr > td {
+    padding: 8px 4px !important;
+  }
+}
+
+/* ============= SCROLLBAR STYLING ============= */
+.dashboard-container .ant-table-body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.dashboard-container .ant-table-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-container .ant-table-body::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 3px;
+}
+
+.dashboard-container .ant-table-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.4);
+}
+

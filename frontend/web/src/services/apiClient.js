@@ -1,3 +1,6 @@
+// Backend API URL
+// Development: direct to localhost:5000
+// Production: use environment variable
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Helper: lấy token từ localStorage
