@@ -1,0 +1,251 @@
+/* ============= ADMIN LAYOUT PROFESSIONAL DESIGN ============= */
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --dark-bg: #0f172a;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+/* ============= SIDEBAR STYLES ============= */
+.admin-sidebar {
+  background: var(--dark-bg);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid rgba(102, 126, 234, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-logo {
+  padding: 20px 16px;
+  text-align: center;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 8px;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.admin-logo .logo-text {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  color: #667eea;
+}
+
+.admin-logo .logo-text:hover {
+  transform: scale(1.02);
+}
+
+.admin-menu {
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  flex: 1;
+}
+
+.admin-menu .ant-menu-item {
+  margin: 6px 12px;
+  padding: 10px 14px !important;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid transparent;
+}
+
+/* Ripple effect on menu items */
+.admin-menu .ant-menu-item::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+}
+
+.admin-menu .ant-menu-item:hover::before {
+  width: 200px;
+  height: 200px;
+}
+
+.admin-menu .ant-menu-item:hover {
+  background-color: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: white !important;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.admin-menu .ant-menu-item-selected {
+  background: rgba(102, 126, 234, 0.15) !important;
+  border: 1px solid rgba(102, 126, 234, 0.2) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  position: relative;
+}
+
+.admin-menu .ant-menu-item-selected::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: #667eea;
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+}
+
+/* ============= HEADER STYLES ============= */
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 0 24px;
+  height: 70px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.admin-header-left h2 {
+  color: white;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.admin-header-right .ant-avatar {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.admin-header-right .ant-avatar:hover {
+  transform: scale(1.08);
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+/* ============= CONTENT STYLES ============= */
+.admin-content {
+  padding: 28px 24px;
+  background: #f5f7fa;
+  min-height: calc(100vh - 70px);
+  animation: slideIn 0.25s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============= RESPONSIVE DESIGN ============= */
+@media (max-width: 768px) {
+  .admin-header {
+    height: 60px;
+    padding: 0 16px;
+  }
+
+  .admin-header-left h2 {
+    font-size: 18px;
+  }
+
+  .admin-header-right {
+    gap: 12px;
+  }
+
+  .admin-content {
+    padding: 16px 12px;
+    min-height: calc(100vh - 60px);
+  }
+
+  .admin-sidebar {
+    min-width: 200px;
+  }
+
+  .admin-logo {
+    padding: 16px 12px;
+  }
+
+  .admin-menu .ant-menu-item {
+    margin: 4px 8px;
+    padding: 10px 12px !important;
+  }
+}
+
+/* ============= SCROLLBAR STYLING ============= */
+.admin-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 3px;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.4);
+}
+
+/* ============= SIDEBAR FOOTER ============= */
+.sidebar-footer {
+  padding: 16px 12px;
+  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  margin-top: auto;
+}
+
+.sidebar-footer .ant-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.sidebar-footer .ant-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+  opacity: 0.9;
+}
+

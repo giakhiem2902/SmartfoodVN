@@ -1,0 +1,266 @@
+/* Management Pages Styles */
+
+.management-container {
+  background-color: #f5f7fa;
+  padding: 24px;
+  border-radius: 8px;
+}
+
+/* Card Styling */
+.ant-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.ant-card:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.ant-card-head {
+  border-bottom: 1px solid #e9ecef;
+  background: transparent;
+}
+
+.ant-card-head-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 18px;
+}
+
+/* Table Styling */
+.ant-table {
+  font-size: 14px;
+}
+
+.ant-table-thead > tr > th {
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e9ecef;
+  padding: 16px 8px;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #fafbfc;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #e9ecef;
+  padding: 16px 8px;
+  transition: background-color 0.2s ease;
+}
+
+.ant-table-pagination {
+  margin-top: 16px;
+}
+
+/* Buttons */
+.ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+  opacity: 0.9;
+}
+
+.ant-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ant-btn-default {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.ant-btn-default:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.ant-btn-danger {
+  background-color: #ff4d4f;
+  border: none;
+  border-radius: 6px;
+}
+
+.ant-btn-danger:hover {
+  background-color: #ff7875;
+  box-shadow: 0 4px 8px rgba(255, 77, 79, 0.2);
+}
+
+/* Modal */
+.ant-modal-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-radius: 12px;
+}
+
+.ant-modal-header {
+  border-bottom: 1px solid #e9ecef;
+  background: transparent;
+  border-radius: 12px 12px 0 0;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 18px;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid #e9ecef;
+  background: transparent;
+}
+
+/* Form */
+.ant-form-item-label > label {
+  font-weight: 500;
+  color: #333;
+}
+
+.ant-form-item-required::before {
+  content: '* ';
+  color: #ff4d4f;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-select-focused .ant-select-selector,
+.ant-picker:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Tags */
+.ant-tag {
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-weight: 500;
+}
+
+/* Search Input */
+.ant-input-search {
+  margin-bottom: 16px;
+}
+
+.ant-input-search .ant-input {
+  border-radius: 6px;
+}
+
+.ant-input-search .ant-input-search-button {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Space */
+.ant-space {
+  gap: 8px;
+}
+
+/* Popconfirm */
+.ant-popover-inner {
+  border-radius: 8px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ant-popover-arrow-content {
+  background-color: white;
+  border: 1px solid #e9ecef;
+}
+
+/* Avatar */
+.ant-avatar {
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.ant-avatar:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+/* Upload */
+.ant-upload {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+  background-color: #fafbfc;
+}
+
+.ant-upload:hover {
+  border-color: #667eea;
+  background-color: #f0f2ff;
+}
+
+.ant-upload-text {
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* Spin */
+.ant-spin {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ant-card {
+    border-radius: 8px;
+  }
+
+  .ant-table {
+    font-size: 12px;
+  }
+
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 12px 4px;
+  }
+
+  .ant-btn {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .ant-modal {
+    width: 90% !important;
+  }
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ant-card {
+  animation: slideIn 0.4s ease;
+}

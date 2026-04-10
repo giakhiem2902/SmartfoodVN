@@ -10,6 +10,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const orderRoutes = require('./src/routes/orderRoutes');
 const storeRoutes = require('./src/routes/storeRoutes');
 const googleAuthRoutes = require('./src/routes/googleAuthRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 require('./src/config/passport'); // Load passport strategies
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/google', googleAuthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
