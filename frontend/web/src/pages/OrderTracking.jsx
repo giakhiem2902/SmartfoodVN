@@ -282,20 +282,22 @@ const OrderTracking = ({ token }) => {
           {/* Right Column - Map and Items */}
           <Col xs={24} lg={12}>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              {/* Map Card */}
-              <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>🗺️</span>
-                  <Typography.Title level={4} style={{ margin: 0 }}>Bản đồ</Typography.Title>
-                </div>
-                <div style={{ height: '450px', borderRadius: '6px', overflow: 'hidden' }}>
-                  <TrackingMap
-                    driverPos={driverLocation}
-                    storePos={{ lat: order.store.lat, lng: order.store.lng, name: order.store.name }}
-                    userPos={{ lat: order.delivery_lat, lng: order.delivery_lng }}
-                  />
-                </div>
-              </Card>
+              {/* Map Card - Only show when driver accepted the order */}
+              {['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING', 'COMPLETED'].includes(order.status) && (
+                <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '20px' }}>🗺️</span>
+                    <Typography.Title level={4} style={{ margin: 0 }}>Bản đồ</Typography.Title>
+                  </div>
+                  <div style={{ height: '450px', borderRadius: '6px', overflow: 'hidden' }}>
+                    <TrackingMap
+                      driverPos={driverLocation || (order.driver?.latitude && order.driver?.longitude ? { lat: order.driver.latitude, lng: order.driver.longitude } : null)}
+                      storePos={{ lat: order.store.lat, lng: order.store.lng, name: order.store.name }}
+                      userPos={{ lat: order.delivery_lat, lng: order.delivery_lng }}
+                    />
+                  </div>
+                </Card>
+              )}
 
               {/* Items Card */}
               <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderRadius: '8px' }}>
