@@ -25,8 +25,11 @@ sequelize.authenticate()
   .then(() => {
     console.log('✅ Database connected');
     
-    httpServer.listen(SOCKET_PORT, () => {
-      console.log(`🔌 Socket.io server running on port ${SOCKET_PORT}`);
+    httpServer.listen(SOCKET_PORT, '0.0.0.0', () => {
+      console.log(`🔌 Socket.io server running on 0.0.0.0:${SOCKET_PORT}`);
+      console.log(`   Mobile app can reach at: http://10.0.2.2:${SOCKET_PORT} (Android emulator)`);
+      console.log(`   Mobile app can reach at: http://localhost:${SOCKET_PORT} (iOS simulator)`);
+      console.log(`   Mobile app can reach at: http://<your-dev-machine-ip>:${SOCKET_PORT} (physical device)`);
     });
   })
   .catch(err => {

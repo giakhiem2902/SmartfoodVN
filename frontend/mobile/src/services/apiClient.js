@@ -1,6 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Use dev machine IP on Android emulator, localhost on iOS
+const resolveApiUrl = () => {
+  if (global?.__API_BASE_URL__) return global.__API_BASE_URL__;
+  if (typeof process !== 'undefined' && process.env && process.env.API_BASE_URL) 
+    return process.env.API_BASE_URL;
+  
+  if (Platform.OS === 'android') {
+    console.log('[apiClient] Android detected, using 172.20.10.4:5000');
+    return 'http://172.20.10.4:5000/api';
+  }
+  
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = resolveApiUrl();
 
 // ─── OSRM Public API (OpenStreetMap routing) ──────────────────────────────────
 // Returns decoded array of { latitude, longitude } for a multi-waypoint route
