@@ -44,16 +44,28 @@ const TrackingMap = ({ driverPos, storePos, userPos }) => {
     }
   }, [userPos]);
 
-  // Fetch route from OSRM API
+  // Fetch route from OSRM API - Route: driver -> store -> user (or store -> user if no driver)
   useEffect(() => {
     const fetchRoute = async () => {
       if (!storePos || !userPos) return;
       
       try {
         setLoading(true);
+        
+        // If we have driver position, create route: driver -> store -> user
+        // Otherwise: store -> user
         const startPos = driverPos || storePos;
         
-        const url = `https://router.project-osrm.org/route/v1/driving/${startPos.lng},${startPos.lat};${userPos.lng},${userPos.lat}?overview=full&geometries=geojson`;
+        let url;
+        if (driverPos && driverPos.lat && driverPos.lng) {
+          // Full route: driver -> store -> user
+          url = `https://router.project-osrm.org/route/v1/driving/${driverPos.lng},${driverPos.lat};${storePos.lng},${storePos.lat};${userPos.lng},${userPos.lat}?overview=full&geometries=geojson`;
+          console.log('[TrackingMap] Fetching route: driver -> store -> user', url);
+        } else {
+          // Simple route: store -> user
+          url = `https://router.project-osrm.org/route/v1/driving/${storePos.lng},${storePos.lat};${userPos.lng},${userPos.lat}?overview=full&geometries=geojson`;
+          console.log('[TrackingMap] Fetching route: store -> user', url);
+        }
         
         const response = await fetch(url);
         const data = await response.json();
@@ -61,14 +73,34 @@ const TrackingMap = ({ driverPos, storePos, userPos }) => {
         if (data.routes && data.routes[0]) {
           const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
           setRouteCoordinates(coords);
+          console.log('[TrackingMap] Route fetched successfully:', coords.length, 'waypoints');
+        } else {
+          console.error('[TrackingMap] No routes found in response');
+          // Fallback to straight line
+          const startPos = driverPos || storePos;
+          setRouteCoordinates([
+            [startPos.lat, startPos.lng],
+            [userPos.lat, userPos.lng]
+          ]);
         }
       } catch (error) {
-        console.error('Error fetching route:', error);
+        console.error('[TrackingMap] Error fetching route:', error);
+        // Fallback: simple line connections
         const startPos = driverPos || storePos;
-        setRouteCoordinates([
-          [startPos.lat, startPos.lng],
-          [userPos.lat, userPos.lng]
-        ]);
+        if (driverPos) {
+          // driver -> store -> user
+          setRouteCoordinates([
+            [driverPos.lat, driverPos.lng],
+            [storePos.lat, storePos.lng],
+            [userPos.lat, userPos.lng]
+          ]);
+        } else {
+          // store -> user
+          setRouteCoordinates([
+            [storePos.lat, storePos.lng],
+            [userPos.lat, userPos.lng]
+          ]);
+        }
       } finally {
         setLoading(false);
       }
