@@ -224,9 +224,6 @@ const UserManagement = () => {
             style={{ width: 250 }}
             prefix={<SearchOutlined />}
           />
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddUser}>
-            Thêm User
-          </Button>
         </Space>
       }
     >

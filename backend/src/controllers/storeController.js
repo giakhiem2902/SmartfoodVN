@@ -260,14 +260,23 @@ const getDetails = async (req, res, next) => {
 const getFoodsByStore = async (req, res, next) => {
   try {
     const { storeId } = req.params;
+    const { all } = req.query; // Query param để lấy tất cả foods hoặc chỉ foods sẵn bán
 
     const store = await Store.findByPk(storeId);
     if (!store) {
       return sendError(res, 'Store not found', 404);
     }
 
+    const where = { store_id: storeId };
+    
+    // Nếu all=true, lấy tất cả foods (cho store owner quản lý)
+    // Nếu all=false hoặc không có, chỉ lấy foods sẵn bán (cho user xem menu)
+    if (all !== 'true') {
+      where.is_available = true;
+    }
+
     const foods = await Food.findAll({
-      where: { store_id: storeId },
+      where,
       include: ['category'],
       order: [['created_at', 'DESC']],
     });

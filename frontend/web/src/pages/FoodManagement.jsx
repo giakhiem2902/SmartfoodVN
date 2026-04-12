@@ -14,6 +14,7 @@ import {
   Popconfirm,
   Upload,
   Image,
+  Typography,
 } from 'antd';
 import {
   PlusOutlined,
@@ -25,6 +26,8 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import '../styles/Management.css';
+
+const { Text } = Typography;
 
 const FoodManagement = () => {
   const [foods, setFoods] = useState([]);
@@ -99,7 +102,7 @@ const FoodManagement = () => {
       store_id: record.store_id,
       price: record.price,
       is_hot: record.is_hot,
-      status: record.is_active ? 'Active' : 'Inactive',
+      is_available: record.is_available,
     });
     setIsModalVisible(true);
   };
@@ -108,11 +111,13 @@ const FoodManagement = () => {
     try {
       const formData = new FormData();
       formData.append('name', values.name);
-      formData.append('category_id', values.category_id);
-      formData.append('store_id', values.store_id);
-      formData.append('price', values.price);
-      formData.append('is_hot', values.is_hot);
-      formData.append('status', values.status);
+      formData.append('category_id', parseInt(values.category_id));
+      formData.append('store_id', parseInt(values.store_id));
+      formData.append('price', parseFloat(values.price));
+      formData.append('is_hot', values.is_hot === true || values.is_hot === 'true');
+      formData.append('status', values.is_available ? 'Active' : 'Inactive');
+
+      // Add image if exists
       if (imageFile) {
         formData.append('image', imageFile);
       }
@@ -135,9 +140,11 @@ const FoodManagement = () => {
         message.success('Thêm food thành công!');
       }
       setIsModalVisible(false);
+      setImageFile(null);
       fetchFoods();
     } catch (error) {
-      message.error('Lỗi: ' + error.message);
+      console.error('Error saving food:', error);
+      message.error('Lỗi: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -287,7 +294,10 @@ const FoodManagement = () => {
         title={editingFood ? 'Sửa Food' : 'Thêm Food Mới'}
         open={isModalVisible}
         onOk={() => form.submit()}
-        onCancel={() => setIsModalVisible(false)}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setImageFile(null);
+        }}
         width={600}
       >
         <Form form={form} layout="vertical" onFinish={handleSaveFood}>
@@ -347,26 +357,50 @@ const FoodManagement = () => {
           </Form.Item>
 
           <Form.Item
-            name="status"
+            name="is_available"
             label="Trạng Thái"
             rules={[{ required: true }]}
           >
             <Select placeholder="Chọn trạng thái">
-              <Select.Option value="Active">Active</Select.Option>
-              <Select.Option value="Inactive">Inactive</Select.Option>
+              <Select.Option value={true}>Có sẵn</Select.Option>
+              <Select.Option value={false}>Hết hàng</Select.Option>
             </Select>
           </Form.Item>
 
-          <Form.Item label="Hình Ảnh">
+          <Form.Item label="Hình Ảnh Food">
             <Upload
-              beforeUpload={(file) => {
-                setImageFile(file);
-                return false;
-              }}
+              beforeUpload={() => false}
               maxCount={1}
+              onChange={({ fileList }) => {
+                if (fileList.length > 0) {
+                  setImageFile(fileList[0].originFileObj);
+                } else {
+                  setImageFile(null);
+                }
+              }}
+              accept="image/*"
             >
-              <Button icon={<UploadOutlined />}>Chọn Hình Ảnh</Button>
+              <Button icon={<UploadOutlined />}>Chọn Ảnh</Button>
             </Upload>
+            {imageFile && (
+              <div style={{ marginTop: 12 }}>
+                <Image
+                  src={URL.createObjectURL(imageFile)}
+                  alt="preview"
+                  style={{ width: 100, height: 100, objectFit: 'cover' }}
+                />
+              </div>
+            )}
+            {editingFood && editingFood.image && !imageFile && (
+              <div style={{ marginTop: 12 }}>
+                <Text type="secondary">Ảnh hiện tại:</Text>
+                <Image
+                  src={editingFood.image}
+                  alt="current"
+                  style={{ width: 100, height: 100, objectFit: 'cover', marginTop: 8 }}
+                />
+              </div>
+            )}
           </Form.Item>
         </Form>
       </Modal>

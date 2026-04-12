@@ -1,8 +1,9 @@
 const express = require('express');
-const { User, Order, Food, Store, Category, OrderItem, sequelize } = require('../models');
+const { User, Order, Food, Store, Category, OrderItem, StoreRegistration, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const upload = require('../config/multer');
 
 const router = express.Router();
 
@@ -114,12 +115,20 @@ router.get('/users', auth, checkAdmin, async (req, res) => {
       order: [['created_at', 'DESC']],
     });
 
+    // Reverse role map to display proper names
+    const roleDisplayMap = {
+      'user': 'Customer',
+      'driver': 'Driver',
+      'store': 'Store Owner',
+      'admin': 'Admin'
+    };
+
     const formattedUsers = users.map((user) => ({
       id: user.id,
       name: user.username,
       email: user.email,
       phone: user.phone,
-      role: user.role,
+      role: roleDisplayMap[user.role] || user.role,
       status: user.is_online ? 'Active' : 'Inactive',
       joinDate: new Date(user.created_at).toLocaleDateString('vi-VN'),
       orders: 0,
@@ -135,16 +144,28 @@ router.get('/users', auth, checkAdmin, async (req, res) => {
 router.post('/users', auth, checkAdmin, async (req, res) => {
   try {
     const { name, email, phone, role, status } = req.body;
+    
+    // Normalize role values from frontend format to database format
+    const roleMap = {
+      'Customer': 'user',
+      'Driver': 'driver',
+      'Store Owner': 'store',
+      'Admin': 'admin'
+    };
+    
+    const dbRole = roleMap[role] || role.toLowerCase();
+    
     const user = await User.create({
       username: name,
       email,
       phone,
-      role,
+      role: dbRole,
       is_online: status === 'Active',
       password: 'temp123456',
     });
     res.status(201).json(user);
   } catch (error) {
+    console.error('Error in POST /users:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -154,16 +175,27 @@ router.put('/users/:id', auth, checkAdmin, async (req, res) => {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Normalize role values from frontend format to database format
+    const roleMap = {
+      'Customer': 'user',
+      'Driver': 'driver',
+      'Store Owner': 'store',
+      'Admin': 'admin'
+    };
+    
+    const dbRole = req.body.role ? (roleMap[req.body.role] || req.body.role.toLowerCase()) : user.role;
+
     await user.update({
       username: req.body.name || user.username,
       email: req.body.email || user.email,
       phone: req.body.phone || user.phone,
-      role: req.body.role || user.role,
+      role: dbRole,
       is_online: req.body.status === 'Active',
     });
 
     res.json(user);
   } catch (error) {
+    console.error('Error in PUT /users/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -189,57 +221,80 @@ router.get('/foods', auth, checkAdmin, async (req, res) => {
       ],
     });
 
-    const formattedFoods = foods.map((food) => ({
-      id: food.id,
-      name: food.name,
-      category: food.category?.name || 'Unknown',
-      store: food.store?.name || 'Unknown',
-      price: food.price,
-      isHot: food.is_hot || false,
-      image: food.image_url || 'https://via.placeholder.com/100',
-      rating: food.rating || 0,
-      status: food.is_active ? 'Active' : 'Inactive',
-    }));
+    const formattedFoods = foods.map((food) => {
+      const imageUrl = food.image_url 
+        ? (food.image_url.startsWith('http') ? food.image_url : `http://localhost:5000${food.image_url}`)
+        : 'https://via.placeholder.com/100';
+      
+      return {
+        id: food.id,
+        name: food.name,
+        category_id: food.category_id,
+        store_id: food.store_id,
+        category: food.category?.name || 'Unknown',
+        store: food.store?.name || 'Unknown',
+        price: food.price,
+        isHot: food.is_hot || false,
+        image: imageUrl,
+        rating: food.rating || 0,
+        status: food.is_available ? 'Active' : 'Inactive',
+        is_active: food.is_available,
+      };
+    });
 
     res.json(formattedFoods);
   } catch (error) {
+    console.error('Error in GET /foods:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post('/foods', auth, checkAdmin, async (req, res) => {
+router.post('/foods', auth, checkAdmin, upload.single('image'), async (req, res) => {
   try {
     const { name, category_id, store_id, price, is_hot, status } = req.body;
+    
+    if (!name || !category_id || !store_id || !price) {
+      return res.status(400).json({ error: 'Missing required fields: name, category_id, store_id, price' });
+    }
+
+    const imageUrl = req.file ? `/uploads/foods/${req.file.filename}` : null;
+
     const food = await Food.create({
       name,
-      price,
+      price: parseFloat(price),
       is_hot: is_hot === true || is_hot === 'true',
-      is_active: status === 'Active',
-      category_id,
-      store_id,
+      is_available: status === 'Active',
+      category_id: parseInt(category_id),
+      store_id: parseInt(store_id),
+      image_url: imageUrl,
     });
     res.status(201).json(food);
   } catch (error) {
+    console.error('Error in POST /foods:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.put('/foods/:id', auth, checkAdmin, async (req, res) => {
+router.put('/foods/:id', auth, checkAdmin, upload.single('image'), async (req, res) => {
   try {
     const food = await Food.findByPk(req.params.id);
     if (!food) return res.status(404).json({ message: 'Food not found' });
 
+    const imageUrl = req.file ? `/uploads/foods/${req.file.filename}` : food.image_url;
+
     await food.update({
       name: req.body.name || food.name,
-      price: req.body.price || food.price,
+      price: req.body.price ? parseFloat(req.body.price) : food.price,
       is_hot: req.body.is_hot !== undefined ? req.body.is_hot : food.is_hot,
-      is_active: req.body.status === 'Active',
+      is_available: req.body.status === 'Active',
       category_id: req.body.category_id || food.category_id,
       store_id: req.body.store_id || food.store_id,
+      image_url: imageUrl,
     });
 
     res.json(food);
   } catch (error) {
+    console.error('Error in PUT /foods/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -267,12 +322,23 @@ router.get('/orders', auth, checkAdmin, async (req, res) => {
       order: [['created_at', 'DESC']],
     });
 
+    const statusDisplayMap = {
+      'PENDING': 'Pending',
+      'CONFIRMED': 'Confirmed',
+      'FINDING_DRIVER': 'Finding Driver',
+      'DRIVER_ACCEPTED': 'Driver Accepted',
+      'PICKING_UP': 'Picking Up',
+      'DELIVERING': 'Delivering',
+      'COMPLETED': 'Completed',
+      'CANCELLED': 'Cancelled',
+    };
+
     const formattedOrders = orders.map((order) => ({
       id: order.id,
       customer: order.user?.username || 'Unknown',
       store: order.store?.name || 'Unknown',
       amount: order.total_price,
-      status: order.status,
+      status: statusDisplayMap[order.status] || order.status,
       paymentMethod: order.payment_method || 'Cash',
       driver: order.driver?.username || 'Chưa có',
       orderDate: new Date(order.created_at).toLocaleDateString('vi-VN'),
@@ -282,6 +348,7 @@ router.get('/orders', auth, checkAdmin, async (req, res) => {
 
     res.json(formattedOrders);
   } catch (error) {
+    console.error('Error in /orders endpoint:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -290,13 +357,22 @@ router.get('/orders/statistics', auth, checkAdmin, async (req, res) => {
   try {
     const totalOrders = await Order.count();
     const completedOrders = await Order.count({
-      where: { status: 'Completed' },
+      where: { status: 'COMPLETED' },
     });
     const pendingOrders = await Order.count({
-      where: { status: ['Pending', 'Confirmed'] },
+      where: { 
+        [Op.or]: [
+          { status: 'PENDING' },
+          { status: 'CONFIRMED' },
+          { status: 'FINDING_DRIVER' },
+          { status: 'DRIVER_ACCEPTED' },
+          { status: 'PICKING_UP' },
+          { status: 'DELIVERING' }
+        ]
+      },
     });
     const cancelledOrders = await Order.count({
-      where: { status: 'Cancelled' },
+      where: { status: 'CANCELLED' },
     });
 
     res.json({
@@ -306,6 +382,7 @@ router.get('/orders/statistics', auth, checkAdmin, async (req, res) => {
       cancelledOrders,
     });
   } catch (error) {
+    console.error('Error in /orders/statistics:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -400,9 +477,30 @@ router.put('/orders/:id/status', auth, checkAdmin, async (req, res) => {
     const order = await Order.findByPk(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    await order.update({ status: req.body.status });
+    // Normalize status values - accept both uppercase and Title case
+    const statusMap = {
+      'pending': 'PENDING',
+      'Pending': 'PENDING',
+      'confirmed': 'CONFIRMED',
+      'Confirmed': 'CONFIRMED',
+      'finding_driver': 'FINDING_DRIVER',
+      'driver_accepted': 'DRIVER_ACCEPTED',
+      'picking_up': 'PICKING_UP',
+      'Picking Up': 'PICKING_UP',
+      'delivering': 'DELIVERING',
+      'Delivering': 'DELIVERING',
+      'completed': 'COMPLETED',
+      'Completed': 'COMPLETED',
+      'cancelled': 'CANCELLED',
+      'Cancelled': 'CANCELLED',
+    };
+
+    const dbStatus = statusMap[req.body.status] || req.body.status.toUpperCase();
+
+    await order.update({ status: dbStatus });
     res.json(order);
   } catch (error) {
+    console.error('Error in PUT /orders/:id/status:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -421,11 +519,12 @@ router.get('/stores', auth, checkAdmin, async (req, res) => {
       id: store.id,
       name: store.name,
       owner: store.owner?.username || 'Unknown',
-      phone: store.owner?.phone || 'N/A',
+      owner_id: store.owner_id,
+      phone: store.phone || store.owner?.phone || 'N/A',
       email: store.owner?.email || 'N/A',
       address: store.address || '',
-      city: store.city || 'N/A',
-      rating: store.rating || 0,
+      city: 'N/A', // Since stores table doesn't have city column
+      rating: 0,
       reviews: 0,
       status: store.is_active ? 'Active' : 'Inactive',
       foods: store.foods?.length || 0,
@@ -434,22 +533,34 @@ router.get('/stores', auth, checkAdmin, async (req, res) => {
 
     res.json(formattedStores);
   } catch (error) {
+    console.error('Error in GET /stores:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/stores', auth, checkAdmin, async (req, res) => {
   try {
-    const { name, owner, phone, email, address, city, status } = req.body;
+    const { name, owner_id, phone, email, address, status } = req.body;
+    
+    // Support both owner_id and owner field names
+    const ownerIdValue = owner_id || req.body.owner;
+    
+    if (!name || !ownerIdValue) {
+      return res.status(400).json({ error: 'Missing required fields: name, owner_id' });
+    }
+
     const store = await Store.create({
       name,
-      address,
-      city,
+      address: address || '',
+      phone: phone || '',
       is_active: status === 'Active',
-      owner_id: owner,
+      owner_id: parseInt(ownerIdValue),
+      lat: 0, // Default latitude
+      lng: 0, // Default longitude
     });
     res.status(201).json(store);
   } catch (error) {
+    console.error('Error in POST /stores:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -462,12 +573,14 @@ router.put('/stores/:id', auth, checkAdmin, async (req, res) => {
     await store.update({
       name: req.body.name || store.name,
       address: req.body.address || store.address,
-      city: req.body.city || store.city,
+      phone: req.body.phone || store.phone,
       is_active: req.body.status === 'Active',
+      // Note: owner_id and city not editable for safety
     });
 
     res.json(store);
   } catch (error) {
+    console.error('Error in PUT /stores/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -484,6 +597,34 @@ router.delete('/stores/:id', auth, checkAdmin, async (req, res) => {
 });
 
 // ============= CATEGORIES MANAGEMENT =============
+// Get categories by store (PHẢI ĐẶT TRƯỚC /:id để tránh conflict)
+router.get('/categories-by-store/:storeId', auth, checkAdmin, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    
+    const categories = await Category.findAll({
+      where: { store_id: storeId },
+      include: [{ model: Food, as: 'foods', attributes: ['id'] }],
+    });
+
+    const formattedCategories = categories.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      description: cat.description || '',
+      icon: '📦',
+      foods: cat.foods?.length || 0,
+      status: 'Active',
+      store_id: cat.store_id,
+    }));
+
+    res.json(formattedCategories);
+  } catch (error) {
+    console.error('Error in GET /categories-by-store/:storeId:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all categories
 router.get('/categories', auth, checkAdmin, async (req, res) => {
   try {
     const categories = await Category.findAll({
@@ -494,28 +635,46 @@ router.get('/categories', auth, checkAdmin, async (req, res) => {
       id: cat.id,
       name: cat.name,
       description: cat.description || '',
-      icon: cat.icon || '📦',
+      icon: '📦', // Default icon since model doesn't store it
       foods: cat.foods?.length || 0,
-      status: cat.is_active ? 'Active' : 'Inactive',
+      status: 'Active', // Categories are always active by default
+      store_id: cat.store_id,
     }));
 
     res.json(formattedCategories);
   } catch (error) {
+    console.error('Error in GET /categories:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/categories', auth, checkAdmin, async (req, res) => {
   try {
-    const { name, description, icon, status } = req.body;
+    const { name, description, store_id } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Missing required field: name' });
+    }
+
+    let finalStoreId = store_id;
+    
+    // If store_id not provided, get the first store from database
+    if (!finalStoreId) {
+      const firstStore = await Store.findOne({ order: [['id', 'ASC']] });
+      if (!firstStore) {
+        return res.status(400).json({ error: 'No stores exist in database. Please create a store first.' });
+      }
+      finalStoreId = firstStore.id;
+    }
+
     const category = await Category.create({
       name,
-      description,
-      icon,
-      is_active: status === 'Active',
+      description: description || '',
+      store_id: parseInt(finalStoreId),
     });
     res.status(201).json(category);
   } catch (error) {
+    console.error('Error in POST /categories:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -528,12 +687,12 @@ router.put('/categories/:id', auth, checkAdmin, async (req, res) => {
     await category.update({
       name: req.body.name || category.name,
       description: req.body.description || category.description,
-      icon: req.body.icon || category.icon,
-      is_active: req.body.status === 'Active',
+      // Note: icon and is_active not supported in current schema
     });
 
     res.json(category);
   } catch (error) {
+    console.error('Error in PUT /categories/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -557,6 +716,147 @@ router.put('/settings', auth, checkAdmin, async (req, res) => {
     res.json({ message: 'Settings updated', data: req.body });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= STORE REGISTRATIONS MANAGEMENT =============
+// Get all store registration applications
+router.get('/store-registrations', auth, checkAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = status ? { status } : {};
+
+    const registrations = await StoreRegistration.findAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'username', 'email', 'phone', 'role'],
+        },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    const formattedRegistrations = registrations.map((reg) => ({
+      id: reg.id,
+      applicantName: reg.user?.username || 'Unknown',
+      applicantEmail: reg.user?.email || 'N/A',
+      applicantPhone: reg.user?.phone || 'N/A',
+      storeName: reg.store_name,
+      businessType: reg.business_type,
+      address: reg.store_address,
+      phone: reg.store_phone,
+      lat: reg.lat,
+      lng: reg.lng,
+      status: reg.status,
+      rejectionReason: reg.rejection_reason,
+      image: reg.store_image_url,
+      submittedAt: reg.created_at,
+      updatedAt: reg.updated_at,
+      userId: reg.user_id,
+    }));
+
+    res.json(formattedRegistrations);
+  } catch (error) {
+    console.error('Error in GET /store-registrations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update store registration status (approve/reject)
+router.patch('/store-registrations/:id', auth, checkAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be PENDING, APPROVED, or REJECTED' });
+    }
+
+    const registration = await StoreRegistration.findByPk(id);
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+
+    const user = await User.findByPk(registration.user_id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let store = null;
+
+    // If approving, create or update store
+    if (status === 'APPROVED') {
+      // Check if user already has a store
+      store = await Store.findOne({ where: { owner_id: user.id } });
+
+      const storePayload = {
+        owner_id: user.id,
+        name: registration.store_name,
+        address: registration.store_address,
+        phone: registration.store_phone || user.phone,
+        lat: registration.lat,
+        lng: registration.lng,
+        description: registration.business_type,
+        image_url: registration.store_image_url,
+        is_active: true,
+      };
+
+      if (store) {
+        // Update existing store
+        await store.update(storePayload);
+      } else {
+        // Create new store
+        store = await Store.create(storePayload);
+      }
+
+      // Update user role to store if not already
+      if (user.role !== 'store') {
+        await user.update({ role: 'store' });
+      }
+    }
+
+    // Update registration status
+    await registration.update({
+      status,
+      rejection_reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+    });
+
+    res.json({
+      message: `Registration ${status.toLowerCase()} successfully`,
+      registration,
+      store,
+    });
+  } catch (error) {
+    console.error('Error in PATCH /store-registrations/:id:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Health check endpoint - ensure default store exists
+router.get('/health', async (req, res) => {
+  try {
+    const storeCount = await Store.count();
+    if (storeCount === 0) {
+      // Create default store if none exist
+      const firstUser = await User.findOne({ where: { role: 'admin' } });
+      if (firstUser) {
+        await Store.create({
+          owner_id: firstUser.id,
+          name: 'Default Store',
+          address: 'Default Address',
+          phone: '0000000000',
+          lat: 10.7769,
+          lng: 106.6966,
+          is_active: true,
+        });
+      }
+    }
+    res.json({ status: 'ok', stores: storeCount });
+  } catch (error) {
+    console.error('Error in /health:', error);
+    res.json({ status: 'ok' });
   }
 });
 
