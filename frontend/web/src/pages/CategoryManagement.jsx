@@ -7,10 +7,14 @@ import {
   Modal,
   Form,
   Input,
+  Select,
   message,
   Spin,
   Popconfirm,
   Upload,
+  Alert,
+  Divider,
+  Tag,
 } from 'antd';
 import {
   PlusOutlined,
@@ -21,38 +25,76 @@ import {
   ImageOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import apiClient from '../services/apiClient';
 import '../styles/Management.css';
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [storesLoading, setStoresLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [form] = Form.useForm();
   const [imageFile, setImageFile] = useState(null);
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
+  const [storeCategoriesLoading, setStoreCategoriesLoading] = useState(false);
+  const [storeCategoriesList, setStoreCategoriesList] = useState([]);
 
   useEffect(() => {
     fetchCategories();
+    fetchStores();
   }, []);
 
-  const fetchCategories = async () => {
-    setLoading(true);
+  const fetchStores = async () => {
+    setStoresLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/admin/categories', {
+      const response = await axios.get('http://localhost:5000/api/admin/stores', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
       });
-      setCategories(response.data);
+      setStores(response.data);
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+      message.error('Lỗi khi tải danh sách stores');
+    }
+    setStoresLoading(false);
+  };
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.getAdminCategories();
+      setCategories(response);
     } catch (error) {
       message.error('Lỗi khi tải danh sách categories');
     }
     setLoading(false);
   };
 
+  const fetchStoreCategoriesById = async (storeId) => {
+    if (!storeId) {
+      setStoreCategoriesList([]);
+      return;
+    }
+
+    setStoreCategoriesLoading(true);
+    try {
+      const response = await apiClient.getAdminCategoriesByStore(storeId);
+      setStoreCategoriesList(response);
+    } catch (error) {
+      console.error('Error fetching store categories:', error);
+      setStoreCategoriesList([]);
+    }
+    setStoreCategoriesLoading(false);
+  };
+
   const handleAddCategory = () => {
     setEditingCategory(null);
+    setSelectedStoreId(null);
+    setStoreCategoriesList([]);
     form.resetFields();
     setImageFile(null);
     setIsModalVisible(true);
@@ -60,38 +102,46 @@ const CategoryManagement = () => {
 
   const handleEditCategory = (record) => {
     setEditingCategory(record);
+    setSelectedStoreId(record.store_id);
     form.setFieldsValue({
       name: record.name,
       description: record.description,
-      icon: record.icon,
-      status: record.status,
+      store_id: record.store_id,
     });
+    fetchStoreCategoriesById(record.store_id);
     setIsModalVisible(true);
+  };
+
+  const handleStoreChange = (storeId) => {
+    setSelectedStoreId(storeId);
+    form.setFieldsValue({ store_id: storeId });
+    fetchStoreCategoriesById(storeId);
   };
 
   const handleSaveCategory = async (values) => {
     try {
-      const formData = new FormData();
-      formData.append('name', values.name);
-      formData.append('description', values.description);
-      formData.append('icon', values.icon);
-      if (imageFile) {
-        formData.append('image', imageFile);
+      if (!selectedStoreId) {
+        message.error('Vui lòng chọn store');
+        return;
       }
 
+      const payload = {
+        name: values.name,
+        description: values.description,
+        store_id: selectedStoreId,
+      };
+
       if (editingCategory) {
-        await axios.put(`http://localhost:5000/api/admin/categories/${editingCategory.id}`, formData, {
+        await axios.put(`http://localhost:5000/api/admin/categories/${editingCategory.id}`, payload, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data',
           },
         });
         message.success('Cập nhật category thành công!');
       } else {
-        await axios.post('http://localhost:5000/api/admin/categories', formData, {
+        await axios.post('http://localhost:5000/api/admin/categories', payload, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data',
           },
         });
         message.success('Thêm category thành công!');
@@ -99,7 +149,8 @@ const CategoryManagement = () => {
       setIsModalVisible(false);
       fetchCategories();
     } catch (error) {
-      message.error('Lỗi: ' + error.message);
+      console.error('Error saving category:', error);
+      message.error('Lỗi: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -135,6 +186,15 @@ const CategoryManagement = () => {
       key: 'name',
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: (name) => <strong>{name}</strong>,
+    },
+    {
+      title: 'Store',
+      dataIndex: 'store_id',
+      key: 'store_id',
+      render: (storeId) => {
+        const store = stores.find(s => s.id === storeId);
+        return store ? <span>{store.name}</span> : <span>-</span>;
+      },
     },
     {
       title: 'Mô Tả',
@@ -212,7 +272,7 @@ const CategoryManagement = () => {
           rowKey="id"
           pagination={{ pageSize: 10 }}
           responsive
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1200 }}
         />
       </Spin>
 
@@ -222,51 +282,76 @@ const CategoryManagement = () => {
         open={isModalVisible}
         onOk={() => form.submit()}
         onCancel={() => setIsModalVisible(false)}
-        width={600}
+        width={700}
       >
-        <Form form={form} layout="vertical" onFinish={handleSaveCategory}>
-          <Form.Item
-            name="name"
-            label="Tên Category"
-            rules={[{ required: true, message: 'Vui lòng nhập tên category' }]}
-          >
-            <Input placeholder="Nhập tên category" />
-          </Form.Item>
-
-          <Form.Item
-            name="description"
-            label="Mô Tả"
-            rules={[{ required: true, message: 'Vui lòng nhập mô tả' }]}
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="Nhập mô tả category"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="icon"
-            label="Icon Emoji"
-            rules={[{ required: true, message: 'Vui lòng nhập icon' }]}
-          >
-            <Input
-              placeholder="Nhập emoji (ví dụ: 🍜)"
-              maxLength={2}
-            />
-          </Form.Item>
-
-          <Form.Item label="Hình Ảnh">
-            <Upload
-              beforeUpload={(file) => {
-                setImageFile(file);
-                return false;
-              }}
-              maxCount={1}
+        <Spin spinning={storesLoading}>
+          <Form form={form} layout="vertical" onFinish={handleSaveCategory}>
+            <Form.Item
+              name="store_id"
+              label="Chọn Store"
+              rules={[{ required: true, message: 'Vui lòng chọn store' }]}
             >
-              <Button icon={<UploadOutlined />}>Chọn Hình Ảnh</Button>
-            </Upload>
-          </Form.Item>
-        </Form>
+              <Select
+                placeholder="Chọn store"
+                onChange={handleStoreChange}
+                loading={storesLoading}
+              >
+                {stores.map((store) => (
+                  <Select.Option key={store.id} value={store.id}>
+                    {store.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            {selectedStoreId && (
+              <>
+                <Divider />
+                <div style={{ marginBottom: 16 }}>
+                  <strong>Danh Mục Hiện Có Của Store Này:</strong>
+                  <Spin spinning={storeCategoriesLoading} style={{ marginTop: 12 }}>
+                    {storeCategoriesList.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                        {storeCategoriesList.map((cat) => (
+                          <Tag key={cat.id} color="blue">
+                            {cat.name}
+                          </Tag>
+                        ))}
+                      </div>
+                    ) : (
+                      <Alert
+                        message="Store này chưa có danh mục nào"
+                        type="info"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                      />
+                    )}
+                  </Spin>
+                </div>
+                <Divider />
+              </>
+            )}
+
+            <Form.Item
+              name="name"
+              label="Tên Category"
+              rules={[{ required: true, message: 'Vui lòng nhập tên category' }]}
+            >
+              <Input placeholder="Nhập tên category (tránh trùng với danh sách trên)" />
+            </Form.Item>
+
+            <Form.Item
+              name="description"
+              label="Mô Tả"
+              rules={[{ required: true, message: 'Vui lòng nhập mô tả' }]}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="Nhập mô tả category"
+              />
+            </Form.Item>
+          </Form>
+        </Spin>
       </Modal>
     </Card>
   );

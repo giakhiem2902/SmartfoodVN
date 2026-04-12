@@ -13,7 +13,9 @@ import {
   Tag,
   Popconfirm,
   InputNumber,
-  Map,
+  Tabs,
+  Alert,
+  Image,
 } from 'antd';
 import {
   PlusOutlined,
@@ -22,21 +24,48 @@ import {
   SearchOutlined,
   EnvironmentOutlined,
   PhoneOutlined,
+  CheckOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import apiClient from '../services/apiClient';
 import '../styles/Management.css';
 
 const StoreManagement = () => {
   const [stores, setStores] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [registrationsLoading, setRegistrationsLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [searchRegistrationText, setSearchRegistrationText] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
+  const [reviewingRegistration, setReviewingRegistration] = useState(null);
+  const [reviewForm] = Form.useForm();
   const [form] = Form.useForm();
+  const [users, setUsers] = useState([]);
+  const [reviewStatus, setReviewStatus] = useState('APPROVED');
+  const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
     fetchStores();
+    fetchRegistrations();
+    fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/admin/users', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchStores = async () => {
     setLoading(true);
@@ -53,6 +82,18 @@ const StoreManagement = () => {
     setLoading(false);
   };
 
+  const fetchRegistrations = async () => {
+    setRegistrationsLoading(true);
+    try {
+      const response = await apiClient.getAdminStoreRegistrations();
+      setRegistrations(response);
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+      message.error('Lỗi khi tải danh sách phiếu đăng ký');
+    }
+    setRegistrationsLoading(false);
+  };
+
   const handleAddStore = () => {
     setEditingStore(null);
     form.resetFields();
@@ -63,11 +104,9 @@ const StoreManagement = () => {
     setEditingStore(record);
     form.setFieldsValue({
       name: record.name,
-      owner: record.owner,
+      owner_id: record.owner_id,
       phone: record.phone,
-      email: record.email,
       address: record.address,
-      city: record.city,
       status: record.status,
     });
     setIsModalVisible(true);
@@ -83,9 +122,16 @@ const StoreManagement = () => {
         });
         message.success('Cập nhật store thành công!');
       } else {
-        await axios.post('http://localhost:5000/api/admin/stores', values, {
+        // For new stores, convert owner to owner_id if needed
+        const payload = {
+          ...values,
+          owner_id: values.owner_id || values.owner,
+        };
+        delete payload.owner;
+        
+        await axios.post('http://localhost:5000/api/admin/stores', payload, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         });
         message.success('Thêm store thành công!');
@@ -93,7 +139,8 @@ const StoreManagement = () => {
       setIsModalVisible(false);
       fetchStores();
     } catch (error) {
-      message.error('Lỗi: ' + error.message);
+      console.error('Error saving store:', error.response?.data || error.message);
+      message.error('Lỗi: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -111,14 +158,47 @@ const StoreManagement = () => {
     }
   };
 
+  const handleReviewRegistration = (record) => {
+    setReviewingRegistration(record);
+    setReviewStatus('APPROVED');
+    setRejectionReason('');
+    reviewForm.resetFields();
+    setIsReviewModalVisible(true);
+  };
+
+  const handleSubmitReview = async () => {
+    try {
+      await apiClient.updateAdminStoreRegistration(reviewingRegistration.id, {
+        status: reviewStatus,
+        rejectionReason: reviewStatus === 'REJECTED' ? rejectionReason : null,
+      });
+      
+      message.success(`Phiếu đã được ${reviewStatus === 'APPROVED' ? 'duyệt' : 'từ chối'}!`);
+      setIsReviewModalVisible(false);
+      fetchRegistrations();
+      // Also refresh stores if approved
+      if (reviewStatus === 'APPROVED') {
+        fetchStores();
+      }
+    } catch (error) {
+      message.error('Lỗi khi xử lý phiếu đăng ký');
+      console.error('Error:', error);
+    }
+  };
+
   const filteredStores = stores.filter(
     (store) =>
       store.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      store.owner.toLowerCase().includes(searchText.toLowerCase()) ||
-      store.city.toLowerCase().includes(searchText.toLowerCase())
+      store.owner.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const columns = [
+  const filteredRegistrations = registrations.filter(
+    (reg) =>
+      reg.storeName.toLowerCase().includes(searchRegistrationText.toLowerCase()) ||
+      reg.applicantName.toLowerCase().includes(searchRegistrationText.toLowerCase())
+  );
+
+  const storeColumns = [
     {
       title: 'Tên Store',
       dataIndex: 'name',
@@ -132,17 +212,6 @@ const StoreManagement = () => {
       dataIndex: 'owner',
       key: 'owner',
       width: 130,
-    },
-    {
-      title: 'Thành Phố',
-      dataIndex: 'city',
-      key: 'city',
-      filters: [
-        { text: 'TPHCM', value: 'TPHCM' },
-        { text: 'Hà Nội', value: 'Hà Nội' },
-        { text: 'Đà Nẵng', value: 'Đà Nẵng' },
-      ],
-      onFilter: (value, record) => record.city === value,
     },
     {
       title: 'Rating',
@@ -202,36 +271,160 @@ const StoreManagement = () => {
     },
   ];
 
-  return (
-    <Card
-      title="Quản Lý Stores"
-      extra={
-        <Space>
-          <Input.Search
-            placeholder="Tìm kiếm store..."
-            allowClear
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 250 }}
-            prefix={<SearchOutlined />}
-          />
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddStore}>
-            Thêm Store
-          </Button>
-        </Space>
-      }
-    >
-      <Spin spinning={loading}>
-        <Table
-          columns={columns}
-          dataSource={filteredStores}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          responsive
-          scroll={{ x: 1400 }}
-        />
-      </Spin>
+  const registrationColumns = [
+    {
+      title: 'Tên Store',
+      dataIndex: 'storeName',
+      key: 'storeName',
+      render: (name) => <strong>{name}</strong>,
+    },
+    {
+      title: 'Người Đăng Ký',
+      dataIndex: 'applicantName',
+      key: 'applicantName',
+    },
+    {
+      title: 'Email',
+      dataIndex: 'applicantEmail',
+      key: 'applicantEmail',
+    },
+    {
+      title: 'Loại Hàng',
+      dataIndex: 'businessType',
+      key: 'businessType',
+    },
+    {
+      title: 'Địa Chỉ',
+      dataIndex: 'address',
+      key: 'address',
+      render: (text) => (
+        <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {text}
+        </div>
+      ),
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        let color = 'blue';
+        let label = status;
+        if (status === 'APPROVED') {
+          color = 'green';
+          label = 'Đã Duyệt';
+        } else if (status === 'REJECTED') {
+          color = 'red';
+          label = 'Bị Từ Chối';
+        } else if (status === 'PENDING') {
+          label = 'Chờ Duyệt';
+        }
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: 'Ngày Gửi',
+      dataIndex: 'submittedAt',
+      key: 'submittedAt',
+      render: (date) => new Date(date).toLocaleDateString('vi-VN'),
+    },
+    {
+      title: 'Hành Động',
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => handleReviewRegistration(record)}
+          disabled={record.status !== 'PENDING'}
+        >
+          Xem Xét
+        </Button>
+      ),
+    },
+  ];
 
-      {/* Modal */}
+  const tabItems = [
+    {
+      key: 'stores',
+      label: 'Quản Lý Stores',
+      children: (
+        <Card
+          title="Quản Lý Stores"
+          extra={
+            <Space>
+              <Input.Search
+                placeholder="Tìm kiếm store..."
+                allowClear
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ width: 250 }}
+                prefix={<SearchOutlined />}
+              />
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddStore}>
+                Thêm Store
+              </Button>
+            </Space>
+          }
+        >
+          <Spin spinning={loading}>
+            <Table
+              columns={storeColumns}
+              dataSource={filteredStores}
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              responsive
+              scroll={{ x: 1400 }}
+            />
+          </Spin>
+        </Card>
+      ),
+    },
+    {
+      key: 'registrations',
+      label: `Phiếu Đăng Ký (${registrations.filter(r => r.status === 'PENDING').length})`,
+      children: (
+        <Card
+          title="Phiếu Đăng Ký Mở Store"
+          extra={
+            <Input.Search
+              placeholder="Tìm kiếm phiếu..."
+              allowClear
+              onChange={(e) => setSearchRegistrationText(e.target.value)}
+              style={{ width: 250 }}
+              prefix={<SearchOutlined />}
+            />
+          }
+        >
+          <Spin spinning={registrationsLoading}>
+            {registrations.length === 0 ? (
+              <Alert
+                message="Không có phiếu đăng ký"
+                description="Chưa có user nào đăng ký mở store"
+                type="info"
+                showIcon
+              />
+            ) : (
+              <Table
+                columns={registrationColumns}
+                dataSource={filteredRegistrations}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                responsive
+                scroll={{ x: 1200 }}
+              />
+            )}
+          </Spin>
+        </Card>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Tabs items={tabItems} defaultActiveKey="stores" />
+
+      {/* Store Modal */}
       <Modal
         title={editingStore ? 'Sửa Store' : 'Thêm Store Mới'}
         open={isModalVisible}
@@ -249,11 +442,17 @@ const StoreManagement = () => {
           </Form.Item>
 
           <Form.Item
-            name="owner"
+            name="owner_id"
             label="Chủ Sở Hữu"
-            rules={[{ required: true, message: 'Vui lòng nhập tên chủ sở hữu' }]}
+            rules={[{ required: true, message: 'Vui lòng chọn chủ sở hữu' }]}
           >
-            <Input placeholder="Nhập tên chủ sở hữu" />
+            <Select placeholder="Chọn chủ sở hữu">
+              {users.filter(u => u.role === 'Store Owner').map((user) => (
+                <Select.Option key={user.id} value={user.id}>
+                  {user.name} ({user.email})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item
@@ -265,36 +464,11 @@ const StoreManagement = () => {
           </Form.Item>
 
           <Form.Item
-            name="email"
-            label="Email"
-            rules={[
-              { required: true, message: 'Vui lòng nhập email' },
-              { type: 'email', message: 'Email không hợp lệ' },
-            ]}
-          >
-            <Input placeholder="Nhập email" />
-          </Form.Item>
-
-          <Form.Item
             name="address"
             label="Địa Chỉ"
             rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
           >
             <Input placeholder="Nhập địa chỉ" prefix={<EnvironmentOutlined />} />
-          </Form.Item>
-
-          <Form.Item
-            name="city"
-            label="Thành Phố"
-            rules={[{ required: true, message: 'Vui lòng chọn thành phố' }]}
-          >
-            <Select placeholder="Chọn thành phố">
-              <Select.Option value="TPHCM">TPHCM</Select.Option>
-              <Select.Option value="Hà Nội">Hà Nội</Select.Option>
-              <Select.Option value="Đà Nẵng">Đà Nẵng</Select.Option>
-              <Select.Option value="Hải Phòng">Hải Phòng</Select.Option>
-              <Select.Option value="Cần Thơ">Cần Thơ</Select.Option>
-            </Select>
           </Form.Item>
 
           <Form.Item
@@ -310,7 +484,109 @@ const StoreManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+
+      {/* Review Registration Modal */}
+      <Modal
+        title="Xem Xét Phiếu Đăng Ký"
+        open={isReviewModalVisible}
+        onOk={handleSubmitReview}
+        onCancel={() => setIsReviewModalVisible(false)}
+        width={800}
+        okText={reviewStatus === 'APPROVED' ? 'Duyệt' : 'Từ Chối'}
+        okButtonProps={{
+          danger: reviewStatus === 'REJECTED',
+        }}
+      >
+        {reviewingRegistration && (
+          <div>
+            <div style={{ marginBottom: 24 }}>
+              <h3>Thông Tin Phiếu Đăng Ký</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <strong>Tên Store:</strong>
+                  <div>{reviewingRegistration.storeName}</div>
+                </div>
+                <div>
+                  <strong>Loại Hàng:</strong>
+                  <div>{reviewingRegistration.businessType}</div>
+                </div>
+                <div>
+                  <strong>Người Đăng Ký:</strong>
+                  <div>{reviewingRegistration.applicantName}</div>
+                </div>
+                <div>
+                  <strong>Email:</strong>
+                  <div>{reviewingRegistration.applicantEmail}</div>
+                </div>
+                <div>
+                  <strong>Số Điện Thoại:</strong>
+                  <div>{reviewingRegistration.applicantPhone}</div>
+                </div>
+                <div>
+                  <strong>SDT Store:</strong>
+                  <div>{reviewingRegistration.phone}</div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <strong>Địa Chỉ:</strong>
+                  <div>{reviewingRegistration.address}</div>
+                </div>
+              </div>
+              {reviewingRegistration.image && (
+                <div style={{ marginTop: 16 }}>
+                  <strong>Ảnh Cửa Hàng:</strong>
+                  <div style={{ marginTop: 8 }}>
+                    <Image
+                      src={`http://localhost:5000${reviewingRegistration.image}`}
+                      alt="Store"
+                      style={{ maxWidth: 200, maxHeight: 150 }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 24, borderTop: '1px solid #eee', paddingTop: 16 }}>
+              <h3>Quyết Định</h3>
+              <Form
+                layout="vertical"
+                form={reviewForm}
+                initialValues={{ status: 'APPROVED' }}
+              >
+                <Form.Item label="Quyết Định">
+                  <Select
+                    value={reviewStatus}
+                    onChange={(value) => {
+                      setReviewStatus(value);
+                      if (value === 'REJECTED') {
+                        setRejectionReason('');
+                      }
+                    }}
+                  >
+                    <Select.Option value="APPROVED">
+                      <CheckOutlined style={{ color: 'green' }} /> Duyệt
+                    </Select.Option>
+                    <Select.Option value="REJECTED">
+                      <CloseOutlined style={{ color: 'red' }} /> Từ Chối
+                    </Select.Option>
+                  </Select>
+                </Form.Item>
+
+                {reviewStatus === 'REJECTED' && (
+                  <Form.Item label="Lý Do Từ Chối">
+                    <Input.TextArea
+                      rows={3}
+                      placeholder="Nhập lý do từ chối..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                    />
+                  </Form.Item>
+                )}
+              </Form>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
   );
 };
 

@@ -121,7 +121,7 @@ export default function StoreDashboard() {
 
       const [categoryRes, foodRes, orderRes] = await Promise.all([
         apiClient.getStoreCategories(myStore.id),
-        apiClient.getStoreFoods(myStore.id),
+        apiClient.getStoreFoods(myStore.id, true), // true = lấy tất cả foods (bao gồm unavailable)
         apiClient.getStoreOrders(myStore.id),
       ]);
 

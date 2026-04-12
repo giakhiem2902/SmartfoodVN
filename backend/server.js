@@ -57,7 +57,31 @@ app.use(errorHandler);
 // Database sync and server start
 const PORT = process.env.PORT || 5000;
 
-sequelize.sync().then(() => {
+sequelize.sync().then(async () => {
+  // Check and create default store if needed
+  try {
+    const { Store, User } = require('./src/models');
+    const storeCount = await Store.count();
+    if (storeCount === 0) {
+      console.log('📌 No stores found. Creating default store...');
+      const firstUser = await User.findOne({ where: { role: 'admin' } });
+      if (firstUser) {
+        await Store.create({
+          owner_id: firstUser.id,
+          name: 'Default Store',
+          address: 'Default Address',
+          phone: '0000000000',
+          lat: 10.7769,
+          lng: 106.6966,
+          is_active: true,
+        });
+        console.log('✅ Default store created');
+      }
+    }
+  } catch (error) {
+    console.error('⚠️ Error checking stores:', error.message);
+  }
+
   app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);

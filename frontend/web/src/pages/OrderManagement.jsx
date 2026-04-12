@@ -150,6 +150,9 @@ const OrderManagement = () => {
       filters: [
         { text: 'Pending', value: 'Pending' },
         { text: 'Confirmed', value: 'Confirmed' },
+        { text: 'Finding Driver', value: 'Finding Driver' },
+        { text: 'Driver Accepted', value: 'Driver Accepted' },
+        { text: 'Picking Up', value: 'Picking Up' },
         { text: 'Delivering', value: 'Delivering' },
         { text: 'Completed', value: 'Completed' },
         { text: 'Cancelled', value: 'Cancelled' },
@@ -157,11 +160,14 @@ const OrderManagement = () => {
       onFilter: (value, record) => record.status === value,
       render: (status) => {
         const colors = {
-          Pending: 'orange',
-          Confirmed: 'blue',
-          Delivering: 'cyan',
-          Completed: 'green',
-          Cancelled: 'red',
+          'Pending': 'orange',
+          'Confirmed': 'blue',
+          'Finding Driver': 'cyan',
+          'Driver Accepted': 'purple',
+          'Picking Up': 'geekblue',
+          'Delivering': 'cyan',
+          'Completed': 'green',
+          'Cancelled': 'red',
         };
         return <Tag color={colors[status]}>{status}</Tag>;
       },
@@ -191,6 +197,9 @@ const OrderManagement = () => {
           >
             <Select.Option value="Pending">Pending</Select.Option>
             <Select.Option value="Confirmed">Confirmed</Select.Option>
+            <Select.Option value="Finding Driver">Finding Driver</Select.Option>
+            <Select.Option value="Driver Accepted">Driver Accepted</Select.Option>
+            <Select.Option value="Picking Up">Picking Up</Select.Option>
             <Select.Option value="Delivering">Delivering</Select.Option>
             <Select.Option value="Completed">Completed</Select.Option>
             <Select.Option value="Cancelled">Cancelled</Select.Option>

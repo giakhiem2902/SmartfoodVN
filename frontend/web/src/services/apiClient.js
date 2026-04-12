@@ -116,8 +116,9 @@ const apiClient = {
     return request('GET', '/stores/my-store');
   },
 
-  async getStoreFoods(storeId) {
-    return request('GET', `/stores/${storeId}/foods`);
+  async getStoreFoods(storeId, all = false) {
+    const suffix = all ? '?all=true' : '';
+    return request('GET', `/stores/${storeId}/foods${suffix}`);
   },
 
   async getStoreCategories(storeId) {
@@ -151,6 +152,25 @@ const apiClient = {
 
   async reviewStoreRegistration(registrationId, payload) {
     return request('PATCH', `/stores/registrations/${registrationId}/review`, payload);
+  },
+
+  // ==================== ADMIN STORE REGISTRATIONS ====================
+  async getAdminStoreRegistrations(status = '') {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request('GET', `/admin/store-registrations${suffix}`);
+  },
+
+  async updateAdminStoreRegistration(registrationId, payload) {
+    return request('PATCH', `/admin/store-registrations/${registrationId}`, payload);
+  },
+
+  // ==================== ADMIN CATEGORIES ====================
+  async getAdminCategories() {
+    return request('GET', `/admin/categories`);
+  },
+
+  async getAdminCategoriesByStore(storeId) {
+    return request('GET', `/admin/categories-by-store/${storeId}`);
   },
 
   // ==================== ORDERS ====================

@@ -82,6 +82,8 @@ const getStoreDetails = async (storeId) => {
             {
               model: Food,
               as: 'foods',
+              where: { is_available: true }, // Chỉ lấy food sẵn bán
+              required: false, // Vẫn lấy category ngay cả khi không có food sẵn bán
             },
           ],
         },
